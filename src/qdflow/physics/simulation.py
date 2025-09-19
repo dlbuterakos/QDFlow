@@ -1889,7 +1889,7 @@ class ThomasFermi:
         for x in list(self.G.nodes()):
             for y in list(self.G.nodes()):
                 if x != y:
-                    self.G.add_edge(x, y, weight=self.calc_weight(x, y))
+                    self.G.add_edge(x, y, weight=self._calc_weight(x, y))
         return self.G
 
     def _calc_stable_dist(self) -> NDArray[np.float64]:
@@ -2449,7 +2449,7 @@ class ThomasFermi:
         """
         return self._sensor_from_island_charges(
             np.array(
-                self.island_charges_from_charge_state(dot_charges, are_dots_combined),
+                self._island_charges_from_charge_state(dot_charges, are_dots_combined),
                 dtype=np.float64,
             )
         )
