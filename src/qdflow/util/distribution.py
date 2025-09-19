@@ -57,7 +57,7 @@ array([11.626, 3.564, 12.042])    # NOT random, correlated with result_1
 array([-5.813, -1.782, -6.021])    # equal to result_1
 """
 
-from typing import overload, TypeVar, Generic, Any
+from typing import overload, TypeVar, Generic, Any, Sequence
 import numpy as np
 from numpy.typing import NDArray
 from abc import ABC, abstractmethod
@@ -864,11 +864,11 @@ class MatrixCorrelated(CorrelatedDistribution[T], Generic[T]):
     ----------
     matrix : NDArray
         An array with shape ``(num_variables, len(distributions))``.
-    distributions : list[Distribution[T]]
+    distributions : Sequence[Distribution[T]]
         The distributions to draw independent values from.
     """
 
-    def __init__(self, matrix: NDArray, distributions: list[Distribution[T]]):
+    def __init__(self, matrix: NDArray, distributions: Sequence[Distribution[T]]):
         self.matrix = matrix
         self.distributions = distributions
 
