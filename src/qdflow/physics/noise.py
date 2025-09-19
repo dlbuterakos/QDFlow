@@ -52,8 +52,11 @@ from typing import Any, Self, TypeVar, ClassVar
 import scipy.ndimage  # type: ignore[import-untyped]
 import dataclasses
 from dataclasses import dataclass, field
-import util.distribution as distribution
-from physics import simulation
+
+# import .util.distribution as distribution
+from ..util.distribution import Distribution, LogNormal, LogUniform, Uniform, Normal
+from .simulation import ThomasFermi, ThomasFermiOutput, is_transition
+# from physics import simulation
 
 T = TypeVar("T")
 
@@ -632,7 +635,7 @@ class NoiseGenerator:
         for ind in np.ndindex(data_map_t.shape):
             if ind[0] > 0:
                 if np.any(
-                    simulation.is_transition(
+                    is_transition(
                         dot_charges_t[ind],
                         are_dots_combined_t[ind],
                         dot_charges_t[(ind[0] - 1, *(ind[1:]))],
@@ -996,31 +999,31 @@ class NoiseRandomization:
     n_gates: int = 2
     noise_axis: int = 0
 
-    latching_positive: bool | distribution.Distribution[bool] = True
-    white_noise_magnitude: float | distribution.Distribution[float] = 0.0
-    pink_noise_magnitude: float | distribution.Distribution[float] = 0.0
-    telegraph_magnitude: float | distribution.Distribution[float] = 0.0
-    telegraph_relative_stdev: float | distribution.Distribution[float] = 0.0
-    telegraph_low_pixels: float | distribution.Distribution[float] = 1.0
-    telegraph_high_pixels: float | distribution.Distribution[float] = 1.0
-    latching_pixels: float | distribution.Distribution[float] = 0.0
-    sech_blur_width: float | distribution.Distribution[float] = 0.0
-    unint_dot_mag: float | distribution.Distribution[float] = 0.0
+    latching_positive: bool | Distribution[bool] = True
+    white_noise_magnitude: float | Distribution[float] = 0.0
+    pink_noise_magnitude: float | Distribution[float] = 0.0
+    telegraph_magnitude: float | Distribution[float] = 0.0
+    telegraph_relative_stdev: float | Distribution[float] = 0.0
+    telegraph_low_pixels: float | Distribution[float] = 1.0
+    telegraph_high_pixels: float | Distribution[float] = 1.0
+    latching_pixels: float | Distribution[float] = 0.0
+    sech_blur_width: float | Distribution[float] = 0.0
+    unint_dot_mag: float | Distribution[float] = 0.0
     unint_dot_spacing: (
         NDArray[np.float64]
-        | distribution.Distribution[float]
-        | distribution.Distribution[NDArray[np.float64]]
+        | Distribution[float]
+        | Distribution[NDArray[np.float64]]
         | None
     ) = None
-    unint_dot_offset: float | distribution.Distribution[float] = 0.0
-    unint_dot_relative_width: float | distribution.Distribution[float] = 0.0
-    coulomb_peak_offset: float | distribution.Distribution[float] = 0.0
-    coulomb_peak_width: float | distribution.Distribution[float] | None = None
-    coulomb_peak_spacing: float | distribution.Distribution[float] = 1.0
+    unint_dot_offset: float | Distribution[float] = 0.0
+    unint_dot_relative_width: float | Distribution[float] = 0.0
+    coulomb_peak_offset: float | Distribution[float] = 0.0
+    coulomb_peak_width: float | Distribution[float] | None = None
+    coulomb_peak_spacing: float | Distribution[float] = 1.0
     sensor_gate_coupling: (
         NDArray[np.float64]
-        | distribution.Distribution[float]
-        | distribution.Distribution[NDArray[np.float64]]
+        | Distribution[float]
+        | Distribution[NDArray[np.float64]]
         | None
     ) = None
 
@@ -1039,35 +1042,27 @@ class NoiseRandomization:
         NoiseRandomization
             A new ``NoiseRandomization`` object with default values.
         """
-        sgc = (
-            -distribution.LogNormal(-3.5, 0.5)
-            if q_positive
-            else distribution.LogNormal(-3.5, 0.5)
-        )
-        uim = (
-            distribution.Uniform(0.2, 0.25)
-            if q_positive
-            else distribution.Uniform(-0.25, -0.2)
-        )
+        sgc = -LogNormal(-3.5, 0.5) if q_positive else LogNormal(-3.5, 0.5)
+        uim = Uniform(0.2, 0.25) if q_positive else Uniform(-0.25, -0.2)
         output = cls(
             noise_axis=0,
             n_gates=2,
             latching_positive=True,
-            white_noise_magnitude=distribution.Uniform(0.08, 0.12),
-            pink_noise_magnitude=distribution.Uniform(0.08, 0.12),
-            telegraph_magnitude=distribution.Uniform(0.08, 0.12),
-            telegraph_relative_stdev=distribution.Uniform(0, 0.3),
-            telegraph_low_pixels=distribution.Normal(4, 1).abs(),
-            telegraph_high_pixels=distribution.Normal(4, 1).abs(),
-            latching_pixels=distribution.Normal(1, 0.3).abs(),
-            sech_blur_width=distribution.Normal(0.7, 0.2).abs(),
+            white_noise_magnitude=Uniform(0.08, 0.12),
+            pink_noise_magnitude=Uniform(0.08, 0.12),
+            telegraph_magnitude=Uniform(0.08, 0.12),
+            telegraph_relative_stdev=Uniform(0, 0.3),
+            telegraph_low_pixels=Normal(4, 1).abs(),
+            telegraph_high_pixels=Normal(4, 1).abs(),
+            latching_pixels=Normal(1, 0.3).abs(),
+            sech_blur_width=Normal(0.7, 0.2).abs(),
             unint_dot_mag=uim,
-            unint_dot_spacing=distribution.Normal(30, 10).abs(),
-            unint_dot_offset=distribution.Uniform(0, 1),
-            unint_dot_relative_width=distribution.Uniform(0.02, 0.03),
-            coulomb_peak_offset=distribution.Uniform(0, 1),
-            coulomb_peak_width=distribution.Normal(2.0, 0.3).abs(),
-            coulomb_peak_spacing=distribution.Normal(8, 1).abs(),
+            unint_dot_spacing=Normal(30, 10).abs(),
+            unint_dot_offset=Uniform(0, 1),
+            unint_dot_relative_width=Uniform(0.02, 0.03),
+            coulomb_peak_offset=Uniform(0, 1),
+            coulomb_peak_width=Normal(2.0, 0.3).abs(),
+            coulomb_peak_spacing=Normal(8, 1).abs(),
             sensor_gate_coupling=sgc,
         )
         return output
@@ -1140,20 +1135,18 @@ def random_noise_params(
     noise = NoiseParameters()
     noise.noise_axis = r_p.noise_axis
 
-    def draw(dist: T | distribution.Distribution[T], rng: np.random.Generator) -> T:
-        if isinstance(dist, distribution.Distribution):
+    def draw(dist: T | Distribution[T], rng: np.random.Generator) -> T:
+        if isinstance(dist, Distribution):
             return dist.draw(rng)
         else:
             return dist
 
     def multidraw(
-        dist: NDArray
-        | distribution.Distribution[Any]
-        | distribution.Distribution[NDArray],
+        dist: NDArray | Distribution[Any] | Distribution[NDArray],
         n: int,
         rng: np.random.Generator,
     ) -> NDArray:
-        if isinstance(dist, distribution.Distribution):
+        if isinstance(dist, Distribution):
             a = dist.draw(rng)
             if isinstance(a, np.ndarray):
                 return a
