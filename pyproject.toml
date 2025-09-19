@@ -2,25 +2,21 @@
 name = "qdflow"
 version = "0.1.0"
 description = "Quantum dot simulation and noise modeling package"
-authors = [
-    { name = "Your Name", email = "your@email.com" }
-]
+authors = [{ name = "Donovan Buterakos", email = "dbuterak@terpmail.umd.edu" }]
 readme = "README.md"
 requires-python = ">=3.10"
 license = { file = "LICENSE" }
 
 dependencies = [
-    "numpy>=1.24",
-    "scipy>=1.10",
-    "networkx>=3.0",
-    "numba>=0.57",
-    "pytest>=7.0"
+  "numpy>=1.24",
+  "scipy>=1.10",
+  "networkx>=3.0",
+  "numba>=0.57",
+  "pytest>=7.0",
 ]
 
 [project.optional-dependencies]
-dev = [
-    "pytest-cov>=4.0"
-]
+dev = ["pytest-cov>=4.0"]
 
 [build-system]
 requires = ["setuptools>=65.0", "wheel"]
