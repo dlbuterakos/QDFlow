@@ -1,3 +1,10 @@
+[build-system]
+requires = ["setuptools>=65.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
 [project]
 name = "qdflow"
 version = "0.1.0"
@@ -17,7 +24,3 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest-cov>=4.0"]
-
-[build-system]
-requires = ["setuptools>=65.0", "wheel"]
-build-backend = "setuptools.build_meta"
