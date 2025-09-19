@@ -1,4 +1,4 @@
-'''
+"""
 This module contains classes and functions for adding noise to CSDs.
 
 The main noise-adding functions are contained within the ``NoiseGenerator`` class.
@@ -43,26 +43,29 @@ noise realizations will be different in each case.
 However, ``noisy_csd_2`` will (likely) look significantly different, since it
 is generated with a completely different white noise strength, pink noise strength,
 amount of latching noise, etc.
-'''
+"""
 
 import numpy as np
-import scipy # type: ignore[import-untyped]
+import scipy  # type: ignore[import-untyped]
 from numpy.typing import NDArray
 from typing import Any, Self, TypeVar, ClassVar
-import scipy.ndimage # type: ignore[import-untyped]
+import scipy.ndimage  # type: ignore[import-untyped]
 import dataclasses
 from dataclasses import dataclass, field
-import util.distribution as distribution
-from physics import simulation
 
-T = TypeVar('T')
+# import .util.distribution as distribution
+from ..util.distribution import Distribution, LogNormal, LogUniform, Uniform, Normal
+from .simulation import ThomasFermi, ThomasFermiOutput, is_transition
+# from physics import simulation
 
+T = TypeVar("T")
 
 
 _rng = np.random.default_rng()
 
+
 def set_rng_seed(seed):
-    '''
+    """
     Initializes a new random number generator with the given seed,
     used to generate random data.
 
@@ -70,15 +73,14 @@ def set_rng_seed(seed):
     ----------
     seed : {int, array_like[int], SeedSequence, BitGenerator, Generator}
         The seed to use to initialize the random number generator.
-    '''
+    """
     global _rng
     _rng = np.random.default_rng(seed)
 
 
-
 @dataclass(kw_only=True)
 class NoiseParameters:
-    '''
+    """
     Set of parameters used to describe the various types and strengths of noise.
 
     Attributes
@@ -128,47 +130,53 @@ class NoiseParameters:
         A value between 0 and 1 which defines by how much each sech^2 peak
         should be offset applying coulomb peak effects, relative to the norm
         of `coulomb_peak_spacing`.
-    coulomb_peak_spacing : float 
+    coulomb_peak_spacing : float
         A value which determines how far apart each sech^2 peak should be
         when applying coulomb peak effects.
     sensor_gate_coupling : ndarray[float] | None
         A vector with length equal to the number of gates, giving the value
         of the sensor-gate coupling per pixel for each gate.
         If ``None``, no sensor-gate coupling will be applied.
-    '''
-    white_noise_magnitude:float=0.
-    pink_noise_magnitude:float=0.
-    telegraph_magnitude:float=0.
-    telegraph_stdev:float=0.
-    telegraph_low_pixels:float=1.
-    telegraph_high_pixels:float=1.
-    noise_axis:int=0
-    latching_pixels:float=0.
-    latching_positive:bool=True
-    sech_blur_width:float=0.
-    unint_dot_mag:float=0.
-    unint_dot_spacing:NDArray[np.float64]|None=None
-    unint_dot_width:float=0.
-    unint_dot_offset:float=0.
-    coulomb_peak_spacing:float=1.
-    coulomb_peak_offset:float=0.
-    coulomb_peak_width:float|None=None
-    sensor_gate_coupling:NDArray[np.float64]|None=None
+    """
 
-    def _get_unint_dot_spacing(self) -> NDArray[np.float64]|None:
+    white_noise_magnitude: float = 0.0
+    pink_noise_magnitude: float = 0.0
+    telegraph_magnitude: float = 0.0
+    telegraph_stdev: float = 0.0
+    telegraph_low_pixels: float = 1.0
+    telegraph_high_pixels: float = 1.0
+    noise_axis: int = 0
+    latching_pixels: float = 0.0
+    latching_positive: bool = True
+    sech_blur_width: float = 0.0
+    unint_dot_mag: float = 0.0
+    unint_dot_spacing: NDArray[np.float64] | None = None
+    unint_dot_width: float = 0.0
+    unint_dot_offset: float = 0.0
+    coulomb_peak_spacing: float = 1.0
+    coulomb_peak_offset: float = 0.0
+    coulomb_peak_width: float | None = None
+    sensor_gate_coupling: NDArray[np.float64] | None = None
+
+    def _get_unint_dot_spacing(self) -> NDArray[np.float64] | None:
         return self._unint_dot_spacing
-    def _set_unint_dot_spacing(self, val:NDArray[np.float64]|None):
-        self._unint_dot_spacing = np.array(val, dtype=np.float64) if val is not None else None
 
-    def _get_sensor_gate_coupling(self) -> NDArray[np.float64]|None:
+    def _set_unint_dot_spacing(self, val: NDArray[np.float64] | None):
+        self._unint_dot_spacing = (
+            np.array(val, dtype=np.float64) if val is not None else None
+        )
+
+    def _get_sensor_gate_coupling(self) -> NDArray[np.float64] | None:
         return self._sensor_gate_coupling
-    def _set_sensor_gate_coupling(self, val:NDArray[np.float64]|None):
-        self._sensor_gate_coupling = np.array(val, dtype=np.float64) if val is not None else None
 
+    def _set_sensor_gate_coupling(self, val: NDArray[np.float64] | None):
+        self._sensor_gate_coupling = (
+            np.array(val, dtype=np.float64) if val is not None else None
+        )
 
     @classmethod
-    def from_dict(cls, d:dict[str, Any]) -> Self:
-        '''
+    def from_dict(cls, d: dict[str, Any]) -> Self:
+        """
         Creates a new ``NoiseParameters`` object from a ``dict`` of values.
 
         Parameters
@@ -181,44 +189,46 @@ class NoiseParameters:
         -------
         NoiseParameters
             A new ``NoiseParameters`` object with the values specified by ``dict``.
-        '''
+        """
         output = cls()
         for k, v in d.items():
             if hasattr(output, k):
                 setattr(output, k, v)
         return output
-    
 
     def to_dict(self) -> dict[str, Any]:
-        '''
+        """
         Converts the ``NoiseParameters`` object to a ``dict``.
 
         Returns
         -------
         dict[str, Any]
             A dict with values specified by the ``NoiseParameters`` object.
-        '''
+        """
         return dataclasses.asdict(self)
-    
 
     def copy(self) -> Self:
-        '''
+        """
         Creates a copy of a ``NoiseParameters`` object.
 
         Returns
         -------
         NoiseParameters
             A new ``NoiseParameters`` object with the same attribute values as ``self``.
-        '''
+        """
         return dataclasses.replace(self)
 
-NoiseParameters.sensor_gate_coupling = property(NoiseParameters._get_sensor_gate_coupling, NoiseParameters._set_sensor_gate_coupling) # type: ignore
-NoiseParameters.unint_dot_spacing = property(NoiseParameters._get_unint_dot_spacing, NoiseParameters._set_unint_dot_spacing) # type: ignore
+
+NoiseParameters.sensor_gate_coupling = property(
+    NoiseParameters._get_sensor_gate_coupling, NoiseParameters._set_sensor_gate_coupling
+)  # type: ignore
+NoiseParameters.unint_dot_spacing = property(
+    NoiseParameters._get_unint_dot_spacing, NoiseParameters._set_unint_dot_spacing
+)  # type: ignore
 
 
-
-class NoiseGenerator():
-    '''
+class NoiseGenerator:
+    """
     Adds noise and other postprocessing to simulated quantum dot devices.
 
     The following types of noise are supported:
@@ -235,24 +245,32 @@ class NoiseGenerator():
         used to generate noise.
     rng : np.random.Generator
         Random number generator used to generate noise.
-    '''
+    """
 
-    def __init__(self, noise_parameters:NoiseParameters|dict[str,Any], rng:np.random.Generator|None=None):
-        self.noise_parameters = NoiseParameters.from_dict(noise_parameters) if isinstance(noise_parameters, dict) else noise_parameters.copy()
+    def __init__(
+        self,
+        noise_parameters: NoiseParameters | dict[str, Any],
+        rng: np.random.Generator | None = None,
+    ):
+        self.noise_parameters = (
+            NoiseParameters.from_dict(noise_parameters)
+            if isinstance(noise_parameters, dict)
+            else noise_parameters.copy()
+        )
         self.rng = rng if rng is not None else _rng
 
-
-    def coulomb_peak(self, data_map:NDArray[np.float64], peak_center:float,
-                     peak_width:float) -> NDArray[np.float64]:
-        '''
+    def coulomb_peak(
+        self, data_map: NDArray[np.float64], peak_center: float, peak_width: float
+    ) -> NDArray[np.float64]:
+        """
         Calculate sensor value from potential using a single sech^2 lineshape,
         which is valid in the weak coupling regime of dot.
 
         .. deprecated::
             Prefer ``high_coupling_coulomb_peak()`` instead.
-             
+
         See: Beenakker, Phys. Rev. B 44, 1646.
-        
+
         Parameters
         ----------
         data_map : ndarray[float]
@@ -265,20 +283,24 @@ class NoiseGenerator():
         -------
         ndarray[float]
             `data_map` with sech^2 transformation applied.
-        '''
+        """
         return 1 / np.cosh((data_map - peak_center) / peak_width) ** 2
 
-
-    def high_coupling_coulomb_peak(self, data_map:NDArray[np.float64], peak_offset:float,
-                     peak_width:float, peak_spacing:float) -> NDArray[np.float64]:
-        '''
+    def high_coupling_coulomb_peak(
+        self,
+        data_map: NDArray[np.float64],
+        peak_offset: float,
+        peak_width: float,
+        peak_spacing: float,
+    ) -> NDArray[np.float64]:
+        """
         Calculate sensor value from potential using a series of sech^2 functions.
 
         Specifically, returns a sum over ``i`` of the following:
         ``sech((data_map - (i + peak_offset) * peak_spacing)) / peak_width) ** 2``
 
         See: Beenakker, Phys. Rev. B 44, 1646.
-        
+
         Parameters
         ----------
         data_map : ndarray[float]
@@ -290,23 +312,28 @@ class NoiseGenerator():
             The width of the sech^2 functions.
         peak_spacing : float
             A value which determines how far apart each sech^2 peak should be.
-            
+
         Returns
         -------
         ndarray[float]
             `data_map` with coulomb peak transformation applied.
-        '''
-        
-        pmax = int(np.ceil(np.max(data_map) / peak_spacing - peak_offset)+1)
-        pmin = int(np.floor(np.min(data_map) / peak_spacing - peak_offset)-1)
+        """
+
+        pmax = int(np.ceil(np.max(data_map) / peak_spacing - peak_offset) + 1)
+        pmin = int(np.floor(np.min(data_map) / peak_spacing - peak_offset) - 1)
         output = np.zeros(data_map.shape)
-        for p_i in range(pmin, pmax+1):
-            output += 1 / np.cosh((data_map - (p_i + peak_offset)*peak_spacing) / peak_width) ** 2
+        for p_i in range(pmin, pmax + 1):
+            output += (
+                1
+                / np.cosh((data_map - (p_i + peak_offset) * peak_spacing) / peak_width)
+                ** 2
+            )
         return output
 
-
-    def white_noise(self, data_map:NDArray[np.float64], magnitude:float|NDArray[np.float64]) -> NDArray[np.float64]:
-        '''
+    def white_noise(
+        self, data_map: NDArray[np.float64], magnitude: float | NDArray[np.float64]
+    ) -> NDArray[np.float64]:
+        """
         Adds white noise to `data_map`.
 
         Parameters
@@ -322,12 +349,13 @@ class NoiseGenerator():
         -------
         ndarray[float]
             `data_map` with white noise added to it.
-        '''
+        """
         return data_map + self.rng.normal(0, magnitude, data_map.shape)
 
-
-    def pink_noise(self, data_map:NDArray[np.float64], magnitude:float|NDArray[np.float64]) -> NDArray[np.float64]:
-        '''
+    def pink_noise(
+        self, data_map: NDArray[np.float64], magnitude: float | NDArray[np.float64]
+    ) -> NDArray[np.float64]:
+        """
         Adds pink (1/f) noise to `data_map`.
 
         Parameters
@@ -343,36 +371,48 @@ class NoiseGenerator():
         -------
         ndarray[float]
             `data_map` with pink noise added to it.
-        '''
-        
-        phases = self.rng.uniform(0, 2*np.pi, data_map.shape)
+        """
+
+        phases = self.rng.uniform(0, 2 * np.pi, data_map.shape)
         magnitudes = self.rng.normal(0, 1, data_map.shape)
-                
-        sq_list  = [(np.minimum(np.arange(0, l),np.arange(l,0,-1)))**2 for l in data_map.shape]
+
+        sq_list = [
+            (np.minimum(np.arange(0, l), np.arange(l, 0, -1))) ** 2
+            for l in data_map.shape
+        ]
         f_factor = sq_list[0]
         for sql in sq_list[1:]:
-            f_factor = np.add.outer(f_factor,sql)
-        np.put(f_factor, [0]*len(data_map.shape), 1)
-        f_factor = 1/np.sqrt(f_factor)
-        np.put(f_factor, [0]*len(data_map.shape), 0)
+            f_factor = np.add.outer(f_factor, sql)
+        np.put(f_factor, [0] * len(data_map.shape), 1)
+        f_factor = 1 / np.sqrt(f_factor)
+        np.put(f_factor, [0] * len(data_map.shape), 0)
 
         f_factor_scale = np.sqrt(np.sum(f_factor**2))
 
-        pink_noise = np.real(np.fft.fftn(magnitudes * np.exp(phases * 1j) * f_factor)) * np.sqrt(2) / f_factor_scale
+        pink_noise = (
+            np.real(np.fft.fftn(magnitudes * np.exp(phases * 1j) * f_factor))
+            * np.sqrt(2)
+            / f_factor_scale
+        )
 
         return data_map + magnitude * pink_noise
 
-
-    def telegraph_noise(self, data_map:NDArray[np.float64], magnitude:float|NDArray[np.float64],
-                        stdev:float|NDArray[np.float64], ave_low_pixels:float,
-                        ave_high_pixels:float, axis:int) -> NDArray[np.float64]:
-        '''
+    def telegraph_noise(
+        self,
+        data_map: NDArray[np.float64],
+        magnitude: float | NDArray[np.float64],
+        stdev: float | NDArray[np.float64],
+        ave_low_pixels: float,
+        ave_high_pixels: float,
+        axis: int,
+    ) -> NDArray[np.float64]:
+        """
         Adds  `telegraph noise <en.wikipedia.org/wiki/burst_noise>`_ to `data_map`.
 
         Specifically, adds a constant value to a line of several continuous pixels,
         Then adds a different constant value to the next several pixels, etc.
         The number of pixels before each jump is drawn from a geometric distribution
-        with mean given by `ave_low_pixels` or `ave_high_pixels`, 
+        with mean given by `ave_low_pixels` or `ave_high_pixels`,
         and the constant value added is drawn from a normal distribution with
         mean +/- ``magnitude/2`` and standard deviation ``stdev/sqrt(2)``,
         with the sign alternating after each jump.
@@ -398,39 +438,61 @@ class NoiseGenerator():
         -------
         ndarray[float]
             `data_map` with telegraph noise added to it.
-        '''
+        """
         output = np.array(data_map)
-        low_p = 1/max(ave_low_pixels,1)
-        high_p = 1/max(ave_high_pixels,1)
+        low_p = 1 / max(ave_low_pixels, 1)
+        high_p = 1 / max(ave_high_pixels, 1)
         ax_len = data_map.shape[axis]
-        non_axis_shape = tuple(data_map.shape[:axis])+tuple(data_map.shape[axis+1:])
-        start_low = self.rng.random(non_axis_shape) < ave_low_pixels / (ave_low_pixels + ave_high_pixels)
+        non_axis_shape = tuple(data_map.shape[:axis]) + tuple(
+            data_map.shape[axis + 1 :]
+        )
+        start_low = self.rng.random(non_axis_shape) < ave_low_pixels / (
+            ave_low_pixels + ave_high_pixels
+        )
         for ind in np.ndindex(non_axis_shape):
-            sd = (stdev if isinstance(stdev, float) else stdev[tuple(ind[:axis])+(slice(None),)+tuple(ind[axis:])]) / np.sqrt(2)
-            mag = (magnitude if isinstance(magnitude, float) else magnitude[tuple(ind[:axis])+(slice(None),)+tuple(ind[axis:])]) / 2
+            sd = (
+                stdev
+                if isinstance(stdev, float)
+                else stdev[tuple(ind[:axis]) + (slice(None),) + tuple(ind[axis:])]
+            ) / np.sqrt(2)
+            mag = (
+                magnitude
+                if isinstance(magnitude, float)
+                else magnitude[tuple(ind[:axis]) + (slice(None),) + tuple(ind[axis:])]
+            ) / 2
             rand_arr = self.rng.random(ax_len)
-            norm_arr = self.rng.normal(0,sd,ax_len)
+            norm_arr = self.rng.normal(0, sd, ax_len)
             norm_start = self.rng.normal(0, (sd if isinstance(sd, float) else sd[0]))
             low_jump = rand_arr < low_p
             high_jump = rand_arr < high_p
             is_low = start_low[ind]
             noise = np.zeros(ax_len)
-            current_val = (-1 if is_low else 1) * (mag if isinstance(mag, float) else mag[0]) + norm_start
+            current_val = (-1 if is_low else 1) * (
+                mag if isinstance(mag, float) else mag[0]
+            ) + norm_start
             for i in range(ax_len):
                 noise[i] = current_val
                 if is_low and low_jump[i]:
                     is_low = False
-                    current_val = (mag if isinstance(mag, float) else mag[i]) + norm_arr[i]
+                    current_val = (
+                        mag if isinstance(mag, float) else mag[i]
+                    ) + norm_arr[i]
                 elif not is_low and high_jump[i]:
                     is_low = True
-                    current_val = -(mag if isinstance(mag, float) else mag[i]) + norm_arr[i]
-            output[tuple(ind[:axis])+(slice(None),)+tuple(ind[axis:])] += noise
-        return output        
+                    current_val = (
+                        -(mag if isinstance(mag, float) else mag[i]) + norm_arr[i]
+                    )
+            output[tuple(ind[:axis]) + (slice(None),) + tuple(ind[axis:])] += noise
+        return output
 
-
-    def line_shift(self, data_map:NDArray[np.float64], ave_pixels:float, axis:int,
-                   shift_positive:bool=True) -> NDArray[np.float64]:
-        '''
+    def line_shift(
+        self,
+        data_map: NDArray[np.float64],
+        ave_pixels: float,
+        axis: int,
+        shift_positive: bool = True,
+    ) -> NDArray[np.float64]:
+        """
         Mimics latching effects by shifting each line in `data_map` by a random
         number of pixels along the direction of the line.
 
@@ -458,7 +520,7 @@ class NoiseGenerator():
         -------
         ndarray[float]
             `data_map` with each line randomly shifted by some amount.
-        '''
+        """
         if len(data_map.shape) <= 1:
             return np.array(data_map)
         transpose_axes = list(range(len(data_map.shape)))
@@ -466,30 +528,48 @@ class NoiseGenerator():
         transpose_axes[axis] = 0
         data_map_t = np.array(np.transpose(data_map, axes=transpose_axes))
 
-        shift_all = self.rng.geometric(1/(ave_pixels+1), data_map_t.shape[1:]) - 1
+        shift_all = self.rng.geometric(1 / (ave_pixels + 1), data_map_t.shape[1:]) - 1
 
         if shift_positive:
             for ind, shift in np.ndenumerate(shift_all):
                 if shift != 0:
-                    delta = data_map_t[(1,)+tuple(ind)] - data_map_t[(0,)+tuple(ind)]
-                    d0 = data_map_t[(0,)+tuple(ind)]
-                    data_map_t[(slice(shift,None),)+tuple(ind)] = data_map_t[(slice(None,-shift),)+tuple(ind)]
-                    data_map_t[(slice(None,shift),)+tuple(ind)] = np.linspace(d0-shift*delta,d0,shift,endpoint=False)
+                    delta = (
+                        data_map_t[(1,) + tuple(ind)] - data_map_t[(0,) + tuple(ind)]
+                    )
+                    d0 = data_map_t[(0,) + tuple(ind)]
+                    data_map_t[(slice(shift, None),) + tuple(ind)] = data_map_t[
+                        (slice(None, -shift),) + tuple(ind)
+                    ]
+                    data_map_t[(slice(None, shift),) + tuple(ind)] = np.linspace(
+                        d0 - shift * delta, d0, shift, endpoint=False
+                    )
         else:
             for ind, shift in np.ndenumerate(shift_all):
                 if shift != 0:
-                    delta = data_map_t[(-1,)+tuple(ind)] - data_map_t[(-2,)+tuple(ind)]
-                    d0 = data_map_t[(-1,)+tuple(ind)]
-                    data_map_t[(slice(None,-shift),)+tuple(ind)] = data_map_t[(slice(shift,None),)+tuple(ind)]
-                    data_map_t[(slice(-shift,None),)+tuple(ind)] = np.linspace(d0+delta,d0+shift*delta,shift,endpoint=True)
+                    delta = (
+                        data_map_t[(-1,) + tuple(ind)] - data_map_t[(-2,) + tuple(ind)]
+                    )
+                    d0 = data_map_t[(-1,) + tuple(ind)]
+                    data_map_t[(slice(None, -shift),) + tuple(ind)] = data_map_t[
+                        (slice(shift, None),) + tuple(ind)
+                    ]
+                    data_map_t[(slice(-shift, None),) + tuple(ind)] = np.linspace(
+                        d0 + delta, d0 + shift * delta, shift, endpoint=True
+                    )
 
         return np.transpose(data_map_t, axes=transpose_axes)
 
-
-    def latching_noise(self, data_map:NDArray[np.float64], excited_data:NDArray[np.float64],
-                       dot_charges:NDArray[np.int_], are_dots_combined:NDArray[np.bool_],
-                       ave_pixels:float, axis:int, shift_positive:bool=True) -> NDArray[np.float64]:
-        '''
+    def latching_noise(
+        self,
+        data_map: NDArray[np.float64],
+        excited_data: NDArray[np.float64],
+        dot_charges: NDArray[np.int_],
+        are_dots_combined: NDArray[np.bool_],
+        ave_pixels: float,
+        axis: int,
+        shift_positive: bool = True,
+    ) -> NDArray[np.float64]:
+        """
         Adds latching effects by selecting data from ``excited_data`` for a few
         pixels after each transition.
 
@@ -528,7 +608,7 @@ class NoiseGenerator():
         ndarray[float]
             `data_map` with several pixels after each transition selected from
             `excited_data`.
-        '''
+        """
         if len(data_map.shape) <= 1:
             return np.array(data_map)
         transpose_axes = list(range(len(data_map.shape)))
@@ -536,34 +616,49 @@ class NoiseGenerator():
         transpose_axes[axis] = 0
         data_map_t = np.array(np.transpose(data_map, axes=transpose_axes))
         excited_data_t = np.transpose(excited_data, axes=transpose_axes)
-        dot_charges_t = np.transpose(dot_charges, axes=(transpose_axes+[len(data_map.shape)]))
-        are_dots_combined_t = np.transpose(are_dots_combined, axes=(transpose_axes+[len(data_map.shape)]))
+        dot_charges_t = np.transpose(
+            dot_charges, axes=(transpose_axes + [len(data_map.shape)])
+        )
+        are_dots_combined_t = np.transpose(
+            are_dots_combined, axes=(transpose_axes + [len(data_map.shape)])
+        )
 
         if not shift_positive:
             data_map_t = np.flip(data_map_t, axis=0)
             excited_data_t = np.flip(excited_data_t, axis=0)
             dot_charges_t = np.flip(dot_charges_t, axis=0)
             are_dots_combined_t = np.flip(are_dots_combined_t, axis=0)
-     
-        shift = self.rng.geometric(1/(ave_pixels+1), data_map_t.shape) - 1
+
+        shift = self.rng.geometric(1 / (ave_pixels + 1), data_map_t.shape) - 1
         x_max = data_map_t.shape[0]
 
         for ind in np.ndindex(data_map_t.shape):
             if ind[0] > 0:
-                if np.any(simulation.is_transition(dot_charges_t[ind], are_dots_combined_t[ind], 
-                            dot_charges_t[(ind[0]-1, *(ind[1:]))], are_dots_combined_t[(ind[0]-1, *(ind[1:]))])[0]):
-                    i_sh = (slice(ind[0], min(ind[0]+shift[ind],x_max)), *(ind[1:]))
-                    data_map_t[i_sh] = excited_data_t[i_sh] # type: ignore
+                if np.any(
+                    is_transition(
+                        dot_charges_t[ind],
+                        are_dots_combined_t[ind],
+                        dot_charges_t[(ind[0] - 1, *(ind[1:]))],
+                        are_dots_combined_t[(ind[0] - 1, *(ind[1:]))],
+                    )[0]
+                ):
+                    i_sh = (slice(ind[0], min(ind[0] + shift[ind], x_max)), *(ind[1:]))
+                    data_map_t[i_sh] = excited_data_t[i_sh]  # type: ignore
 
         if not shift_positive:
             data_map_t = np.flip(data_map_t, axis=0)
         return np.transpose(data_map_t, axes=transpose_axes)
 
-
-    def unint_dot_add(self, data_map:NDArray[np.float64], magnitude:float|NDArray[np.float64],
-                      spacing:NDArray[np.float64], width:float, offset:float,
-                      gate_data_matrix:NDArray[np.float64]|None=None) -> NDArray[np.float64]:
-        '''
+    def unint_dot_add(
+        self,
+        data_map: NDArray[np.float64],
+        magnitude: float | NDArray[np.float64],
+        spacing: NDArray[np.float64],
+        width: float,
+        offset: float,
+        gate_data_matrix: NDArray[np.float64] | None = None,
+    ) -> NDArray[np.float64]:
+        """
         Add a series of transitions with quantum dot lineshapes to data.
 
         Specifically, for each pixel with coordinates ``x``, adds the following:
@@ -588,28 +683,36 @@ class NoiseGenerator():
             how each of the gates changes as one of the axes of `data_map` changes.
             By default, an identity matrix will be used -- this assumes
             ``len(spacing) == len(data_map.shape)``.
-            
+
         Returns
         -------
         ndarray[float]
             `data_map` with unintended dot effects added.
-        '''
+        """
         spc = np.sqrt(np.sum(spacing**2))
-        gdm = gate_data_matrix if gate_data_matrix is not None else np.identity(len(data_map.shape))
-        phi_list  = [np.dot(spacing, gdm[:,l]) * np.arange(data_map.shape[l]) / spc for l in range(len(data_map.shape))]
+        gdm = (
+            gate_data_matrix
+            if gate_data_matrix is not None
+            else np.identity(len(data_map.shape))
+        )
+        phi_list = [
+            np.dot(spacing, gdm[:, l]) * np.arange(data_map.shape[l]) / spc
+            for l in range(len(data_map.shape))
+        ]
         phi = phi_list[0]
         for pl in phi_list[1:]:
             phi = np.add.outer(phi, pl)
-        pmax = int(np.ceil(np.max(phi) / spc - offset)+1)
-        pmin = int(np.floor(np.min(phi) / spc - offset)-1)
+        pmax = int(np.ceil(np.max(phi) / spc - offset) + 1)
+        pmin = int(np.floor(np.min(phi) / spc - offset) - 1)
         noise = np.zeros(data_map.shape)
-        for p_i in range(pmin, pmax+1):
-            noise += np.tanh((phi - (p_i + offset)*spc) / width)
+        for p_i in range(pmin, pmax + 1):
+            noise += np.tanh((phi - (p_i + offset) * spc) / width)
         return data_map + magnitude * noise
 
-
-    def sech_blur(self, data_map:NDArray[np.float64], blur_width:float, noise_axis:int) -> NDArray[np.float64]:
-        '''
+    def sech_blur(
+        self, data_map: NDArray[np.float64], blur_width: float, noise_axis: int
+    ) -> NDArray[np.float64]:
+        """
         Blurs `datamap` by convoluting with sech^2 kernel.
 
         Parameters
@@ -624,21 +727,29 @@ class NoiseGenerator():
         -------
         ndarray[float]
             `data_map` with sech blur applied.
-        '''
-        conv_max = max(int(np.ceil(blur_width*3)), 3)
-        conv_elems = 2*conv_max+1
-        conv = np.cosh(np.linspace(-conv_max,conv_max,conv_elems)/blur_width)**-2
-        conv = conv/np.sum(conv)
+        """
+        conv_max = max(int(np.ceil(blur_width * 3)), 3)
+        conv_elems = 2 * conv_max + 1
+        conv = np.cosh(np.linspace(-conv_max, conv_max, conv_elems) / blur_width) ** -2
+        conv = conv / np.sum(conv)
         if noise_axis >= len(data_map.shape):
-            raise ValueError("noise_axis must be less than the number of dimensions of data_map")
-        new_dims = list(range(0, noise_axis)) + list(range(noise_axis+1, len(data_map.shape)))
+            raise ValueError(
+                "noise_axis must be less than the number of dimensions of data_map"
+            )
+        new_dims = list(range(0, noise_axis)) + list(
+            range(noise_axis + 1, len(data_map.shape))
+        )
         conv = np.expand_dims(conv, tuple(new_dims))
         return scipy.ndimage.convolve(data_map, conv, mode="nearest")
 
-
-    def sensor_gate(self, data_map:NDArray[np.float64], sensor_gate_coupling:NDArray[np.float64],
-                    magnitude:float|NDArray[np.float64]=1, gate_data_matrix:NDArray[np.float64]|None=None) -> NDArray[np.float64]:
-        '''
+    def sensor_gate(
+        self,
+        data_map: NDArray[np.float64],
+        sensor_gate_coupling: NDArray[np.float64],
+        magnitude: float | NDArray[np.float64] = 1,
+        gate_data_matrix: NDArray[np.float64] | None = None,
+    ) -> NDArray[np.float64]:
+        """
         Add a gradient due to sensor-gate coupling to data.
 
         Parameters
@@ -652,7 +763,7 @@ class NoiseGenerator():
             The total sensor-gate coupling will be multiplied by `magnitude`.
             Usually, this value should be set to 1, and the magnitude encoded in
             `sensor_gate_coupling`.
-            If an array is passed, it should have the same shape as `data_map`. 
+            If an array is passed, it should have the same shape as `data_map`.
         gate_data_matrix : ndarray[float] | None
             A matrix with shape ``(n_gates, len(data_map.shape))`` that indicates
             how each of the gates changes as one of the axes of `data_map` changes.
@@ -663,24 +774,39 @@ class NoiseGenerator():
         -------
         ndarray[float]
             `data_map` with sensor-gate coupling effects added.
-        '''
-        gdm = gate_data_matrix if gate_data_matrix is not None else np.identity(len(data_map.shape))
-        phi_list  = [np.dot(sensor_gate_coupling, gdm[:,l]) * np.arange(data_map.shape[l]) for l in range(len(data_map.shape))]
+        """
+        gdm = (
+            gate_data_matrix
+            if gate_data_matrix is not None
+            else np.identity(len(data_map.shape))
+        )
+        phi_list = [
+            np.dot(sensor_gate_coupling, gdm[:, l]) * np.arange(data_map.shape[l])
+            for l in range(len(data_map.shape))
+        ]
         phi = phi_list[0]
         for pl in phi_list[1:]:
             phi = np.add.outer(phi, pl)
         return data_map + magnitude * phi
 
-
-    def calc_noisy_map(self, data_map:NDArray[np.float64], 
-                       latching_data:None|tuple[NDArray[np.float64],NDArray[np.int_],NDArray[np.bool_]]=None,
-                       gate_data_matrix:None|NDArray[np.float64]=None,
-                       *, noise_default=True, white_noise:bool|None=None,
-                       pink_noise:bool|None=None, coulomb_peak:bool|None=None,
-                       telegraph_noise:bool|None=None, latching:bool|None=None,
-                       unintended_dot:bool|None=None, sech_blur:bool|None=None,
-                       sensor_gate:bool|None=None) -> NDArray[np.float64]:
-        '''
+    def calc_noisy_map(
+        self,
+        data_map: NDArray[np.float64],
+        latching_data: None
+        | tuple[NDArray[np.float64], NDArray[np.int_], NDArray[np.bool_]] = None,
+        gate_data_matrix: None | NDArray[np.float64] = None,
+        *,
+        noise_default=True,
+        white_noise: bool | None = None,
+        pink_noise: bool | None = None,
+        coulomb_peak: bool | None = None,
+        telegraph_noise: bool | None = None,
+        latching: bool | None = None,
+        unintended_dot: bool | None = None,
+        sech_blur: bool | None = None,
+        sensor_gate: bool | None = None,
+    ) -> NDArray[np.float64]:
+        """
         Adds noise to `data_map` with parameters specified by ``self.noiseParameters``.
 
         Parameters
@@ -691,7 +817,7 @@ class NoiseGenerator():
             Additional data used to add realistic latching effects.
             If this parameter is ``None``, latching will be simulated by shifting
             each line of `data_map` by a random amount.
-            
+
             Alternatively, a tuple ``(excited_data, dot_charge, are_dots_combined)``
             can be supplied. Here ``dot_charge`` and ``are_dots_combined`` should
             give the charge state of the system at each pixel.
@@ -730,7 +856,7 @@ class NoiseGenerator():
         -------
         ndarray[float]
             `data_map` with various noise types added.
-        '''
+        """
         param = self.noise_parameters
         noisy_map = np.array(data_map)
         lt = latching if latching is not None else noise_default
@@ -743,16 +869,35 @@ class NoiseGenerator():
         tn = telegraph_noise if telegraph_noise is not None else noise_default
         if lt:
             if latching_data is None:
-                noisy_map = self.line_shift(noisy_map, param.latching_pixels, param.noise_axis,
-                                        param.latching_positive)
+                noisy_map = self.line_shift(
+                    noisy_map,
+                    param.latching_pixels,
+                    param.noise_axis,
+                    param.latching_positive,
+                )
             else:
-                noisy_map = self.latching_noise(noisy_map, latching_data[0], latching_data[1], latching_data[2],
-                                                param.latching_pixels, param.noise_axis, param.latching_positive)
+                noisy_map = self.latching_noise(
+                    noisy_map,
+                    latching_data[0],
+                    latching_data[1],
+                    latching_data[2],
+                    param.latching_pixels,
+                    param.noise_axis,
+                    param.latching_positive,
+                )
         if ud and param.unint_dot_spacing is not None:
-            noisy_map = self.unint_dot_add(noisy_map, param.unint_dot_mag, param.unint_dot_spacing,
-                                           param.unint_dot_width, param.unint_dot_offset, gate_data_matrix)
+            noisy_map = self.unint_dot_add(
+                noisy_map,
+                param.unint_dot_mag,
+                param.unint_dot_spacing,
+                param.unint_dot_width,
+                param.unint_dot_offset,
+                gate_data_matrix,
+            )
         if sb:
-            noisy_map = self.sech_blur(noisy_map, param.sech_blur_width, param.noise_axis)
+            noisy_map = self.sech_blur(
+                noisy_map, param.sech_blur_width, param.noise_axis
+            )
         sgc = param.sensor_gate_coupling
         if sg and sgc is not None:
             noisy_map = self.sensor_gate(noisy_map, sgc, 1, gate_data_matrix)
@@ -761,25 +906,34 @@ class NoiseGenerator():
         if pn:
             noisy_map = self.pink_noise(noisy_map, param.pink_noise_magnitude)
         if tn:
-            noisy_map = self.telegraph_noise(noisy_map, param.telegraph_magnitude, param.telegraph_stdev,
-                                             param.telegraph_low_pixels, param.telegraph_high_pixels, param.noise_axis)
+            noisy_map = self.telegraph_noise(
+                noisy_map,
+                param.telegraph_magnitude,
+                param.telegraph_stdev,
+                param.telegraph_low_pixels,
+                param.telegraph_high_pixels,
+                param.noise_axis,
+            )
         if cp and param.coulomb_peak_width is not None:
-            noisy_map = self.high_coupling_coulomb_peak(noisy_map, param.coulomb_peak_offset,
-                            param.coulomb_peak_width, param.coulomb_peak_spacing)
+            noisy_map = self.high_coupling_coulomb_peak(
+                noisy_map,
+                param.coulomb_peak_offset,
+                param.coulomb_peak_width,
+                param.coulomb_peak_spacing,
+            )
         return noisy_map
-
 
 
 @dataclass(kw_only=True)
 class NoiseRandomization:
-    '''
+    """
     Meta-parameters used to determine how random ``NoiseParameters`` should
     be generated.
 
     All attributes should either be provided a single value
     (if no randmization is needed), or a ``randomize.Distribution`` object,
     from which the value will be drawn.
-    
+
     Attributes
     ----------
     noise_axis : int
@@ -840,32 +994,42 @@ class NoiseRandomization:
         If a float distribution is provided, an ndarray of the appropriate size
         will be generated by repeatedly drawing from the distribution.
         If ``None``, no sensor-gate coupling will be applied.
-    '''
-    n_gates:int=2
-    noise_axis:int=0
+    """
 
-    latching_positive:bool|distribution.Distribution[bool]=True   
-    white_noise_magnitude:float|distribution.Distribution[float]=0.
-    pink_noise_magnitude:float|distribution.Distribution[float]=0.
-    telegraph_magnitude:float|distribution.Distribution[float]=0.
-    telegraph_relative_stdev:float|distribution.Distribution[float]=0.
-    telegraph_low_pixels:float|distribution.Distribution[float]=1.
-    telegraph_high_pixels:float|distribution.Distribution[float]=1.
-    latching_pixels:float|distribution.Distribution[float]=0.
-    sech_blur_width:float|distribution.Distribution[float]=0.
-    unint_dot_mag:float|distribution.Distribution[float]=0.
-    unint_dot_spacing:NDArray[np.float64]|distribution.Distribution[float]|distribution.Distribution[NDArray[np.float64]]|None=None
-    unint_dot_offset:float|distribution.Distribution[float]=0.
-    unint_dot_relative_width:float|distribution.Distribution[float]=0.
-    coulomb_peak_offset:float|distribution.Distribution[float]=0.
-    coulomb_peak_width:float|distribution.Distribution[float]|None=None
-    coulomb_peak_spacing:float|distribution.Distribution[float]=1.
-    sensor_gate_coupling:NDArray[np.float64]|distribution.Distribution[float]|distribution.Distribution[NDArray[np.float64]]|None=None
+    n_gates: int = 2
+    noise_axis: int = 0
 
-    
+    latching_positive: bool | Distribution[bool] = True
+    white_noise_magnitude: float | Distribution[float] = 0.0
+    pink_noise_magnitude: float | Distribution[float] = 0.0
+    telegraph_magnitude: float | Distribution[float] = 0.0
+    telegraph_relative_stdev: float | Distribution[float] = 0.0
+    telegraph_low_pixels: float | Distribution[float] = 1.0
+    telegraph_high_pixels: float | Distribution[float] = 1.0
+    latching_pixels: float | Distribution[float] = 0.0
+    sech_blur_width: float | Distribution[float] = 0.0
+    unint_dot_mag: float | Distribution[float] = 0.0
+    unint_dot_spacing: (
+        NDArray[np.float64]
+        | Distribution[float]
+        | Distribution[NDArray[np.float64]]
+        | None
+    ) = None
+    unint_dot_offset: float | Distribution[float] = 0.0
+    unint_dot_relative_width: float | Distribution[float] = 0.0
+    coulomb_peak_offset: float | Distribution[float] = 0.0
+    coulomb_peak_width: float | Distribution[float] | None = None
+    coulomb_peak_spacing: float | Distribution[float] = 1.0
+    sensor_gate_coupling: (
+        NDArray[np.float64]
+        | Distribution[float]
+        | Distribution[NDArray[np.float64]]
+        | None
+    ) = None
+
     @classmethod
-    def default(cls, q_positive:bool=False) -> Self:
-        '''
+    def default(cls, q_positive: bool = False) -> Self:
+        """
         Creates a new ``NoiseRandomization`` object with default values.
 
         Parameters
@@ -877,36 +1041,35 @@ class NoiseRandomization:
         -------
         NoiseRandomization
             A new ``NoiseRandomization`` object with default values.
-        '''
-        sgc = -distribution.LogNormal(-3.5,.5) if q_positive else distribution.LogNormal(-3.5,.5)
-        uim = distribution.Uniform(.2,.25) if q_positive else distribution.Uniform(-.25,-.2)
+        """
+        sgc = -LogNormal(-3.5, 0.5) if q_positive else LogNormal(-3.5, 0.5)
+        uim = Uniform(0.2, 0.25) if q_positive else Uniform(-0.25, -0.2)
         output = cls(
-                noise_axis=0,
-                n_gates=2,
-                latching_positive=True, 
-                white_noise_magnitude=distribution.Uniform(.08,.12),
-                pink_noise_magnitude=distribution.Uniform(.08,.12),
-                telegraph_magnitude=distribution.Uniform(.08,.12),
-                telegraph_relative_stdev=distribution.Uniform(0,.3),
-                telegraph_low_pixels=distribution.Normal(4,1).abs(),
-                telegraph_high_pixels=distribution.Normal(4,1).abs(),
-                latching_pixels=distribution.Normal(1,.3).abs(),
-                sech_blur_width=distribution.Normal(.7,.2).abs(),
-                unint_dot_mag=uim,
-                unint_dot_spacing=distribution.Normal(30,10).abs(),
-                unint_dot_offset=distribution.Uniform(0,1),
-                unint_dot_relative_width=distribution.Uniform(.02,.03),
-                coulomb_peak_offset=distribution.Uniform(0,1),
-                coulomb_peak_width=distribution.Normal(2.,.3).abs(),
-                coulomb_peak_spacing=distribution.Normal(8,1).abs(),
-                sensor_gate_coupling=sgc
+            noise_axis=0,
+            n_gates=2,
+            latching_positive=True,
+            white_noise_magnitude=Uniform(0.08, 0.12),
+            pink_noise_magnitude=Uniform(0.08, 0.12),
+            telegraph_magnitude=Uniform(0.08, 0.12),
+            telegraph_relative_stdev=Uniform(0, 0.3),
+            telegraph_low_pixels=Normal(4, 1).abs(),
+            telegraph_high_pixels=Normal(4, 1).abs(),
+            latching_pixels=Normal(1, 0.3).abs(),
+            sech_blur_width=Normal(0.7, 0.2).abs(),
+            unint_dot_mag=uim,
+            unint_dot_spacing=Normal(30, 10).abs(),
+            unint_dot_offset=Uniform(0, 1),
+            unint_dot_relative_width=Uniform(0.02, 0.03),
+            coulomb_peak_offset=Uniform(0, 1),
+            coulomb_peak_width=Normal(2.0, 0.3).abs(),
+            coulomb_peak_spacing=Normal(8, 1).abs(),
+            sensor_gate_coupling=sgc,
         )
         return output
 
-
     @classmethod
-    def from_dict(cls, d:dict[str, Any]) -> Self:
-        '''
+    def from_dict(cls, d: dict[str, Any]) -> Self:
+        """
         Creates a new ``NoiseRandomization`` object from a ``dict`` of values.
 
         Parameters
@@ -918,42 +1081,40 @@ class NoiseRandomization:
         -------
         NoiseRandomization
             A new ``NoiseRandomization`` object with the values specified by ``dict``.
-        '''
+        """
         output = cls()
         for k, v in d.items():
             if hasattr(output, k):
                 setattr(output, k, v)
         return output
-    
 
     def to_dict(self) -> dict[str, Any]:
-        '''
+        """
         Converts the ``NoiseRandomization`` object to a ``dict``.
 
         Returns
         -------
         dict[str, Any]
             A dict with values specified by the ``NoiseRandomization`` object.
-        '''
+        """
         return dataclasses.asdict(self)
-    
 
     def copy(self) -> Self:
-        '''
+        """
         Creates a copy of a ``NoiseRandomization`` object.
 
         Returns
         -------
         CSDOutput
             A new ``NoiseRandomization`` object with the same attribute values as ``self``.
-        '''
+        """
         return dataclasses.replace(self)
 
 
-
-def random_noise_params(randomization_params:NoiseRandomization,
-                        noise_scale_factor:float=1.) -> NoiseParameters:
-    '''
+def random_noise_params(
+    randomization_params: NoiseRandomization, noise_scale_factor: float = 1.0
+) -> NoiseParameters:
+    """
     Generates a random set of noise parameters.
 
     Parameters
@@ -968,20 +1129,24 @@ def random_noise_params(randomization_params:NoiseRandomization,
     -------
     NoiseParameters
         The randomized set of noise parameters.
-    '''
+    """
     global _rng
     r_p = randomization_params
     noise = NoiseParameters()
     noise.noise_axis = r_p.noise_axis
 
-    def draw(dist:T|distribution.Distribution[T], rng:np.random.Generator) -> T:
-        if isinstance(dist, distribution.Distribution):
+    def draw(dist: T | Distribution[T], rng: np.random.Generator) -> T:
+        if isinstance(dist, Distribution):
             return dist.draw(rng)
         else:
             return dist
-        
-    def multidraw(dist:NDArray|distribution.Distribution[Any]|distribution.Distribution[NDArray], n:int, rng:np.random.Generator) -> NDArray:
-        if isinstance(dist, distribution.Distribution):
+
+    def multidraw(
+        dist: NDArray | Distribution[Any] | Distribution[NDArray],
+        n: int,
+        rng: np.random.Generator,
+    ) -> NDArray:
+        if isinstance(dist, Distribution):
             a = dist.draw(rng)
             if isinstance(a, np.ndarray):
                 return a
@@ -990,27 +1155,52 @@ def random_noise_params(randomization_params:NoiseRandomization,
                 if n == 1:
                     return a
                 else:
-                    a2 = dist.draw(rng, n-1)
-                    return np.concatenate([a,a2])
+                    a2 = dist.draw(rng, n - 1)
+                    return np.concatenate([a, a2])
         else:
             return dist
 
-    noise.white_noise_magnitude = noise_scale_factor * np.abs(draw(r_p.white_noise_magnitude, _rng))
-    noise.pink_noise_magnitude = noise_scale_factor * np.abs(draw(r_p.pink_noise_magnitude, _rng))
-    noise.telegraph_magnitude = noise_scale_factor * np.abs(draw(r_p.telegraph_magnitude, _rng))
-    noise.telegraph_stdev = noise.telegraph_magnitude * np.abs(draw(r_p.telegraph_relative_stdev, _rng))
-    noise.telegraph_low_pixels = 1+np.abs(draw(r_p.telegraph_low_pixels, _rng)-1)
-    noise.telegraph_high_pixels = 1+np.abs(draw(r_p.telegraph_high_pixels, _rng)-1)
+    noise.white_noise_magnitude = noise_scale_factor * np.abs(
+        draw(r_p.white_noise_magnitude, _rng)
+    )
+    noise.pink_noise_magnitude = noise_scale_factor * np.abs(
+        draw(r_p.pink_noise_magnitude, _rng)
+    )
+    noise.telegraph_magnitude = noise_scale_factor * np.abs(
+        draw(r_p.telegraph_magnitude, _rng)
+    )
+    noise.telegraph_stdev = noise.telegraph_magnitude * np.abs(
+        draw(r_p.telegraph_relative_stdev, _rng)
+    )
+    noise.telegraph_low_pixels = 1 + np.abs(draw(r_p.telegraph_low_pixels, _rng) - 1)
+    noise.telegraph_high_pixels = 1 + np.abs(draw(r_p.telegraph_high_pixels, _rng) - 1)
     noise.latching_pixels = noise_scale_factor * np.abs(draw(r_p.latching_pixels, _rng))
     noise.latching_positive = draw(r_p.latching_positive, _rng)
     noise.sech_blur_width = np.abs(draw(r_p.sech_blur_width, _rng))
     noise.unint_dot_mag = draw(r_p.unint_dot_mag, _rng)
-    all_spacing = multidraw(r_p.unint_dot_spacing, r_p.n_gates, _rng) if r_p.unint_dot_spacing is not None else None
+    all_spacing = (
+        multidraw(r_p.unint_dot_spacing, r_p.n_gates, _rng)
+        if r_p.unint_dot_spacing is not None
+        else None
+    )
     noise.unint_dot_spacing = all_spacing
     noise.unint_dot_offset = draw(r_p.unint_dot_offset, _rng)
-    noise.unint_dot_width = np.sqrt(np.sum(all_spacing**2)) * np.abs(draw(r_p.unint_dot_relative_width, _rng)) if all_spacing is not None else 0.
+    noise.unint_dot_width = (
+        np.sqrt(np.sum(all_spacing**2))
+        * np.abs(draw(r_p.unint_dot_relative_width, _rng))
+        if all_spacing is not None
+        else 0.0
+    )
     noise.coulomb_peak_spacing = np.abs(draw(r_p.coulomb_peak_spacing, _rng))
-    noise.coulomb_peak_width = np.abs(draw(r_p.coulomb_peak_width, _rng)) if r_p.coulomb_peak_width is not None else None
+    noise.coulomb_peak_width = (
+        np.abs(draw(r_p.coulomb_peak_width, _rng))
+        if r_p.coulomb_peak_width is not None
+        else None
+    )
     noise.coulomb_peak_offset = draw(r_p.coulomb_peak_offset, _rng)
-    noise.sensor_gate_coupling = multidraw(r_p.sensor_gate_coupling, r_p.n_gates, _rng) if r_p.sensor_gate_coupling is not None else None
+    noise.sensor_gate_coupling = (
+        multidraw(r_p.sensor_gate_coupling, r_p.n_gates, _rng)
+        if r_p.sensor_gate_coupling is not None
+        else None
+    )
     return noise
