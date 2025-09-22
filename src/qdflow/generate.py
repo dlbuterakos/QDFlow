@@ -1,8 +1,52 @@
+'''
+This module contains classes and functions for generating CSDs and ray data.
+
+Data generation is done with the ``calc_csd()``, calc_2d_csd(), and
+``calc_rays()`` functions. These functions input a ``PhysicsParameters`` object,
+as well as the desired resolution and voltages to sweep. The functions then
+run the physics simulation once for each point in the desired range, and return
+the resulting data in a single instance of the ``CSDOutput`` or ``RaysOutput``
+dataclasses.
+
+Often, diagrams with a wide variety of features are desired in a dataset.
+This is accomplished by randomizing the values of the ``PhysicsParameters``
+object for each diagram. ``random_physics()`` provides a convenient way of
+performing this randomization, and the distributions from which each physics
+parameter should be drawn can be set via the ``PhysicsRandomization`` dataclass. 
+
+Examples
+--------
+
+>>> from qdflow import generate
+>>> from qdflow.util import distribution
+>>> phys_rand = generate.PhysicsRandomization.default()
+>>> phys_rand.mu = distribution.Uniform(0, 1.2) # adjust parameter ranges here
+
+>>> n_devices = 10
+>>> phys_params = generate.random_physics(phys_rand, n_devices)
+
+This will generate a list of 10 random sets of device parameters.
+
+>>> import numpy as np
+>>> phys = phys_params[0]
+
+>>> # Set ranges and resolution of plunger gate sweeps
+>>> V_x = np.linspace(2., 16., 100)
+>>> V_y = np.linspace(2., 16., 100)
+
+>>> csd = generate.calc_2d_csd(phys, V_x, V_y)
+
+``csd`` is a single instance of the ``CSDOutput`` dataclass, which contains the
+results of the calculations. The sensor readout can be obtained as a numpy array
+by using ``csd.sensor[:, :, sensor_num]``, where ``sensor_num`` is the index of
+the desired sensor (0 if just one sensor).
+'''
+
 import numpy as np
 from typing import Any, Self, overload, ClassVar, TypeVar
 from numpy.typing import NDArray
-from physics import simulation as simulation
-import util.distribution as distribution
+from .physics import simulation as simulation
+from .util import distribution as distribution
 import dataclasses
 from dataclasses import dataclass, field
 
@@ -25,50 +69,61 @@ def set_rng_seed(seed):
     _rng = np.random.default_rng(seed)
 
 
+
 @dataclass(kw_only=True)
 class CSDOutput:
     '''
     Output of charge stability diagram calculations. Some attributes may be ``None``
     depending on which quantities are calculated.
 
-    Output values are stored in arrays such that the output for a property at point
-    ``(V_x_vec[i], V_y_vec[j])`` is given by ``property[i][j]``.
-
     Attributes
     ----------
-    
     physics : PhysicsParameters
         The set of physics parameters used in the simulation. 
-    V_x_vec, V_y_vec : ndarray[float]
-        Arrays of voltage values along the x- and y-axes.
+    V_x, V_y : ndarray[float]
+        Arrays of voltage values along the x- and y-axes, which together define
+        the coordinates of each of the pixels.
     x_gate, y_gate : int
-        The dot numbers of the dots whose gate voltages are plotted on the x- or y-axes.
+        The indeces of the dots whose gate voltages are plotted on the
+        x- or y-axes.
     V_gates : ndarray[float]
-        An array of length `n_dots` giving the voltages of each of the
-        plunger gates (not barrier gates).
+        An array of length ``n_dots`` giving the voltages of each of the plunger
+        gates. This is relevant only for plunger gates whose voltages remain
+        constant over the whole diagram, and it contains values of the constant
+        voltages. For the two plunger gates corresponding to the x- and y-axes
+        (``x_gate`` and ``y_gate``), the value of ``V_gates`` is arbitrary.
     sensor : ndarray[float]
-        The Coulomb potential at each sensor.
+        An array with shape ``(len(V_x), len(V_y), n_sensors)`` giving the
+        Coulomb potential at each point at a specific sensor.
     are_dots_occupied : ndarray[bool]
-        An array of booleans, one for each dot, indicating whether each dot is occupied.    
+        An array with shape ``(len(V_x), len(V_y), n_dots)``, indicating whether
+        each dot is occupied at each pixel in the diagram.
     are_dots_combined : ndarray[bool]
-        An array of booleans, one for each internal barrier,
-        indicating whether the dots on each side are combined together
-        (i.e. the barrier is too low).
+        An array with shape ``(len(V_x), len(V_y), n_dots-1)``, indicating
+        at each pixel in the diagram, whether the dots on each side of an
+        internal barrier are combined together (i.e. the barrier is too low).
     dot_charges : ndarray[int]
-        An array of integers, one for each dot, indicating the total number
-        of charges in each dot. In the case of combined dots, the
-        total number of charges will be entered in the left-most dot,
-        with the other dots padded with zeros.
-    converged : ndarray[bool]
-        Whether the calculation of n(x) properly converged.
-    dot_transitions : ndarray[bool]
-        Whether a transition is present at each dot.
-    are_transitions_combined : ndarray[bool]
-        Whether a combined transition is present on either side of each barrier.
+        An array with shape ``(len(V_x), len(V_y), n_dots)``, indicating the
+        total number of charges in each dot at each pixel in the diagram.
+        In the case of combined dots, the total number of charges will be
+        entered in the left-most spot, with the other spots padded with zeros.
+    converged : ndarray[bool] | None
+        An array with shape ``(len(V_x), len(V_y))``, indicating whether the
+        calculation of n(x) properly converged at each pixel in the diagram.
+    dot_transitions : ndarray[bool] | None
+        An array with shape ``(len(V_x), len(V_y), n_dots)``, indicating whether
+        a transition in each dot occurs at each pisel in the diagram.
+    are_transitions_combined : ndarray[bool] | None
+        An array with shape ``(len(V_x), len(V_y), n_dots-1)``, indicating at
+        each pixel in the diagram, whether a transition occurs on a combined dot
+        comprised of dots on either side of each internal barrier.
+    excited_sensor : ndarray[float] | None
+        An array with shape ``(len(V_x), len(V_y), n_sensors)`` giving the
+        Coulomb potential at an excited state at each point at a specific sensor.
     '''
     physics:simulation.PhysicsParameters=field(default_factory=lambda:simulation.PhysicsParameters())
-    V_x_vec:NDArray[np.float64]=field(default_factory=lambda:np.zeros(0, dtype=np.float64))
-    V_y_vec:NDArray[np.float64]=field(default_factory=lambda:np.zeros(0, dtype=np.float64))
+    V_x:NDArray[np.float64]=field(default_factory=lambda:np.zeros(0, dtype=np.float64))
+    V_y:NDArray[np.float64]=field(default_factory=lambda:np.zeros(0, dtype=np.float64))
     x_gate:int=0
     y_gate:int=0
     V_gates:NDArray[np.float64]=field(default_factory=lambda:np.zeros(0, dtype=np.float64))
@@ -86,15 +141,15 @@ class CSDOutput:
     def _set_physics(self, val:simulation.PhysicsParameters):
         self._physics = val.copy()
 
-    def _get_V_x_vec(self) -> NDArray[np.float64]:
-        return self._V_x_vec
-    def _set_V_x_vec(self, val:NDArray[np.float64]):
-        self._V_x_vec = np.array(val, dtype=np.float64)
+    def _get_V_x(self) -> NDArray[np.float64]:
+        return self._V_x
+    def _set_V_x(self, val:NDArray[np.float64]):
+        self._V_x = np.array(val, dtype=np.float64)
 
-    def _get_V_y_vec(self) -> NDArray[np.float64]:
-        return self._V_y_vec
-    def _set_V_y_vec(self, val:NDArray[np.float64]):
-        self._V_y_vec = np.array(val, dtype=np.float64)
+    def _get_V_y(self) -> NDArray[np.float64]:
+        return self._V_y
+    def _set_V_y(self, val:NDArray[np.float64]):
+        self._V_y = np.array(val, dtype=np.float64)
 
     def _get_V_gates(self) -> NDArray[np.float64]:
         return self._V_gates
@@ -188,8 +243,8 @@ class CSDOutput:
         return dataclasses.replace(self)
 
 CSDOutput.physics = property(CSDOutput._get_physics, CSDOutput._set_physics) # type: ignore
-CSDOutput.V_x_vec = property(CSDOutput._get_V_x_vec, CSDOutput._set_V_x_vec) # type: ignore
-CSDOutput.V_y_vec = property(CSDOutput._get_V_y_vec, CSDOutput._set_V_y_vec) # type: ignore
+CSDOutput.V_x = property(CSDOutput._get_V_x, CSDOutput._set_V_x) # type: ignore
+CSDOutput.V_y = property(CSDOutput._get_V_y, CSDOutput._set_V_y) # type: ignore
 CSDOutput.V_gates = property(CSDOutput._get_V_gates, CSDOutput._set_V_gates) # type: ignore
 CSDOutput.sensor = property(CSDOutput._get_sensor, CSDOutput._set_sensor) # type: ignore
 CSDOutput.converged = property(CSDOutput._get_converged, CSDOutput._set_converged) # type: ignore
@@ -325,80 +380,87 @@ class PhysicsRandomization:
     num_sensors:int=1
     multiply_gates_by_q:bool=True
 
-    dot_spacing:float|distribution.Distribution[float]=field(default_factory=lambda:distribution.Delta(200))
-    x_margins:float|distribution.Distribution[float]=field(default_factory=lambda:distribution.Delta(200))
-    gate_x_rel_variations:float|distribution.Distribution[float]=field(default_factory=lambda:distribution.Delta(0))
-    q:float|distribution.Distribution[float]=field(default_factory=lambda:distribution.Delta(-1))
-    K_0:float|distribution.Distribution[float]=field(default_factory=lambda:distribution.LogUniform(.5, 60))
-    sigma:float|distribution.Distribution[float]=field(default_factory=lambda:distribution.Uniform(40, 80))
-    mu:float|distribution.Distribution[float]=field(default_factory=lambda:PhysicsRandomization._correlated_default('mu'))
-    g_0:float|distribution.Distribution[float]=field(default_factory=lambda:distribution.LogUniform(.005, .009))
-    V_L:float|distribution.Distribution[float]=field(default_factory=lambda:PhysicsRandomization._correlated_default('V_L'))
-    V_R:float|distribution.Distribution[float]=field(default_factory=lambda:PhysicsRandomization._correlated_default('V_R'))
-    beta:float|distribution.Distribution[float]=field(default_factory=lambda:PhysicsRandomization._correlated_default('beta'))
-    kT:float|distribution.Distribution[float]=field(default_factory=lambda:PhysicsRandomization._correlated_default('kT'))
-    c_k:float|distribution.Distribution[float]=field(default_factory=lambda:distribution.LogUniform(.25, 6))
-    screening_length:float|distribution.Distribution[float]=field(default_factory=lambda:PhysicsRandomization._correlated_default('scr'))
-    rho:float|distribution.Distribution[float]=field(default_factory=lambda:distribution.Uniform(10, 20))
-    h:float|distribution.Distribution[float]=field(default_factory=lambda:PhysicsRandomization._correlated_default('h'))
-    rho_rel_variations:float|distribution.Distribution[float]=field(default_factory=lambda:distribution.Delta(0))
-    h_rel_variations:float|distribution.Distribution[float]=field(default_factory=lambda:distribution.Normal(0,.15))
-    plunger_peak:float|distribution.Distribution[float]=field(default_factory=lambda:distribution.Uniform(-12, -2))
-    external_barrier_peak_variations:float|distribution.Distribution[float]=field(default_factory=lambda:distribution.Uniform(.5, 3.5))
-    barrier_peak:float|distribution.Distribution[float]=field(default_factory=lambda:PhysicsRandomization._correlated_default('bar'))
-    barrier_peak_variations:float|distribution.Distribution[float]=field(default_factory=lambda:distribution.Uniform(-1.5, 1.5))
-    sensor_y:float|distribution.Distribution[float]=field(default_factory=lambda:distribution.Delta(-250))
-    sensor_y_rel_variations:float|distribution.Distribution[float]=field(default_factory=lambda:distribution.Uniform(-.5, .5))
-    sensor_x_rel_variations:float|distribution.Distribution[float]=field(default_factory=lambda:distribution.Uniform(-.35, .35))
-    WKB_coef:float|distribution.Distribution[float]=field(default_factory=lambda:distribution.Delta(.089))
-    v_F:float|distribution.Distribution[float]=field(default_factory=lambda:distribution.Delta(3.0e13))
+    dot_spacing:float|distribution.Distribution[float]=200
+    x_margins:float|distribution.Distribution[float]=200
+    gate_x_rel_variations:float|distribution.Distribution[float]=0
+    q:float|distribution.Distribution[float]=-1
+    K_0:float|distribution.Distribution[float]=5
+    sigma:float|distribution.Distribution[float]=60
+    mu:float|distribution.Distribution[float]=.5
+    g_0:float|distribution.Distribution[float]=.0065
+    V_L:float|distribution.Distribution[float]=-.01
+    V_R:float|distribution.Distribution[float]=.01
+    beta:float|distribution.Distribution[float]=100
+    kT:float|distribution.Distribution[float]=.01
+    c_k:float|distribution.Distribution[float]=1.2
+    screening_length:float|distribution.Distribution[float]=100
+    rho:float|distribution.Distribution[float]=15
+    h:float|distribution.Distribution[float]=80
+    rho_rel_variations:float|distribution.Distribution[float]=0
+    h_rel_variations:float|distribution.Distribution[float]=0
+    plunger_peak:float|distribution.Distribution[float]=-7
+    external_barrier_peak_variations:float|distribution.Distribution[float]=2.
+    barrier_peak:float|distribution.Distribution[float]=5.
+    barrier_peak_variations:float|distribution.Distribution[float]=0
+    sensor_y:float|distribution.Distribution[float]=-250
+    sensor_y_rel_variations:float|distribution.Distribution[float]=0
+    sensor_x_rel_variations:float|distribution.Distribution[float]=0
+    WKB_coef:float|distribution.Distribution[float]=.089
+    v_F:float|distribution.Distribution[float]=3.0e13
     
-    _correlated_defaults:ClassVar[dict[str,distribution.Distribution[float]]]
-
-
-    def __post_init__(self):
-        PhysicsRandomization._prepare_correlated_defaults()
-
-
-    @classmethod
-    def _correlated_default(cls, key:str) -> distribution.Distribution[float]:
-        return cls._correlated_defaults[key]
-
-
-    @classmethod
-    def _prepare_correlated_defaults(cls):
-        cls._correlated_defaults = {}
-        V_L = distribution.FullyCorrelated(distribution.Uniform(-.02, .02), 2).dependent_distributions()
-        cls._correlated_defaults['V_L'] = V_L[0]
-        cls._correlated_defaults['V_R'] = -V_L[1]
-        beta = distribution.FullyCorrelated(distribution.LogUniform(10, 1000), 2).dependent_distributions()
-        cls._correlated_defaults['beta'] = beta[0]
-        cls._correlated_defaults['kT'] = 1/beta[1]
-        h_scr_bar = distribution.MatrixCorrelated(np.array([[1,0],[0,1],[.09,.0125],[.05,0]]), [
-                    distribution.Normal(80, 15).abs(), distribution.LogUniform(60, 200)]).dependent_distributions()
-        cls._correlated_defaults['h'] = h_scr_bar[0]
-        cls._correlated_defaults['scr'] = h_scr_bar[1]
-        cls._correlated_defaults['bar'] = h_scr_bar[2]-3.5
-        cls._correlated_defaults['mu'] = h_scr_bar[3]-3.5
-
 
     @classmethod
     def default(cls) -> Self:
         '''
-        Creates a new ``PhysicsRandomizationParameters`` object with default values.
+        Creates a new ``PhysicsRandomization`` object with default values.
 
         Returns
         -------
-        PhysicsRandomizationParameters
-            A new ``PhysicsRandomizationParameters`` object with default values.
+        PhysicsRandomization
+            A new ``PhysicsRandomization`` object with default values.
         '''
-        return cls()
+        output = cls(
+            num_x_points=151,
+            num_dots=2,
+            barrier_current=1e-5,
+            short_circuit_current=1e4,
+            num_sensors=1,
+            multiply_gates_by_q=True,
+            dot_spacing=200,
+            x_margins=200,
+            gate_x_rel_variations=0,
+            q=-1,
+            K_0=distribution.LogUniform(.5, 50),
+            sigma=distribution.Uniform(40, 80),
+            mu=.5,
+            g_0=distribution.LogUniform(.0055, .008),
+            V_L=distribution.Uniform(-.02, .02),
+            V_R=distribution.Uniform(-.02, .02),
+            beta=distribution.LogUniform(10, 1000),
+            kT=distribution.LogUniform(.001, .1),
+            c_k=distribution.LogUniform(.25, 6),
+            screening_length=distribution.LogUniform(75, 150),
+            rho=distribution.Uniform(10, 20),
+            h=distribution.Normal(80, 5).abs(),
+            rho_rel_variations=0,
+            h_rel_variations=distribution.Normal(0,.15),
+            plunger_peak=distribution.Uniform(-12, -2),
+            external_barrier_peak_variations=distribution.Uniform(.5, 3.5),
+            barrier_peak=5.,
+            barrier_peak_variations=distribution.Uniform(-1.5, 1.5),
+            sensor_y=-250,
+            sensor_y_rel_variations=distribution.Uniform(-.5, .5),
+            sensor_x_rel_variations=distribution.Uniform(-.35, .35),
+            WKB_coef=.089,
+            v_F=3.0e13
+        )
+        return output
 
 
     @classmethod
     def from_dict(cls, d:dict[str, Any]) -> Self:
         '''
-        Creates a new ``PhysicsRandomizationParameters`` object from a ``dict`` of values.
+        Creates a new ``PhysicsRandomization`` object from a ``dict`` of values.
 
         Parameters
         ----------
@@ -407,8 +469,8 @@ class PhysicsRandomization:
 
         Returns
         -------
-        PhysicsRandomizationParameters
-            A new ``PhysicsRandomizationParameters`` object with the values specified by ``dict``.
+        PhysicsRandomization
+            A new ``PhysicsRandomization`` object with the values specified by ``dict``.
         '''
         output = cls()
         for k, v in d.items():
@@ -419,29 +481,26 @@ class PhysicsRandomization:
 
     def to_dict(self) -> dict[str, Any]:
         '''
-        Converts the ``PhysicsRandomizationParameters`` object to a ``dict``.
+        Converts the ``PhysicsRandomization`` object to a ``dict``.
 
         Returns
         -------
         dict[str, Any]
-            A dict with values specified by the ``PhysicsRandomizationParameters`` object.
+            A dict with values specified by the ``PhysicsRandomization`` object.
         '''
         return dataclasses.asdict(self)
     
 
     def copy(self) -> Self:
         '''
-        Creates a copy of a ``PhysicsRandomizationParameters`` object.
+        Creates a copy of a ``PhysicsRandomization`` object.
 
         Returns
         -------
         CSDOutput
-            A new ``PhysicsRandomizationParameters`` object with the same attribute values as ``self``.
+            A new ``PhysicsRandomization`` object with the same attribute values as ``self``.
         '''
         return dataclasses.replace(self)
-
-PhysicsRandomization._prepare_correlated_defaults()
-
 
 
 def default_physics(n_dots:int=2) -> simulation.PhysicsParameters:
@@ -458,34 +517,30 @@ def default_physics(n_dots:int=2) -> simulation.PhysicsParameters:
     simulation.PhysicsParameters
         A default set of physics parameters.
     '''
-    dot_points = 40
-    edge_points = 40
-    delta_x = 5.
-    N_grid = 2*edge_points + (n_dots-1)*dot_points + 1
-    system_size = (N_grid-1)*delta_x
-    x = np.linspace(-system_size/2, system_size/2, N_grid, endpoint=True)
+    dot_spacing = 200
+    x_points = 51 + 50 * n_dots
+    x_size = 200 + dot_spacing * n_dots
+    x = np.linspace(-x_size/2, x_size/2, x_points, endpoint=True)
 
     physics = simulation.PhysicsParameters(
-        x=x, q=-1, K_0=2, sigma=60, g_0=.01, beta=100, kT=.01, c_k=2,
-        V_L=0, V_R=0, screening_length=100, mu=0,
-        WKB_coef=.02, v_F=3.0e13, barrier_current=1e-5,
-        short_circuit_current=1e4
+        x=x, q=-1, K_0=5, sigma=60, mu=.5, g_0=.0065, V_L=-.01, V_R=.01,
+        beta=100, kT=.01, c_k=1.2, screening_length=100, WKB_coef=.089,
+        v_F=3.0e13, barrier_current=1e-5, short_circuit_current=1e4
     )
     
     def gate_peak(i):
         if i == 0 or i == 2*n_dots:
-            return -8
+            return -7
         elif i % 2 == 0:
             return -5
         else:
-            return 5
-    gates = [simulation.GateParameters(mean=(i-n_dots)*dot_points*delta_x/2, 
-                    peak=gate_peak(i), rho=20, h=60, screen=100)
+            return 7
+    gates = [simulation.GateParameters(mean=(i-n_dots)*dot_spacing/2, 
+                    peak=gate_peak(i), rho=15, h=80, screen=100)
              for i in range(2*n_dots+1)]
     physics.gates = gates
-    physics.sensors=np.array([[(i-n_dots)*dot_points*delta_x/2, 200, 0] for i in range(2*n_dots+1)])
+    physics.sensors=np.array([[0, -250, 0]])
     return physics
-
 
 
 @overload
@@ -500,7 +555,7 @@ def random_physics(randomization_params:PhysicsRandomization, num_physics:int|No
 
     Parameters
     ----------
-    randomization_params : PhysicsRandomizationParameters
+    randomization_params : PhysicsRandomization
         Meta-parameters which indicate how the ``PhysicsParameters`` should be
         randomized.
     num_physics : int
@@ -581,13 +636,13 @@ def random_physics(randomization_params:PhysicsRandomization, num_physics:int|No
     return output[0] if num_physics is None else output
 
 
-
 def calc_csd(n_dots:int, physics:simulation.PhysicsParameters,
-                V_x:NDArray[np.float64], V_y:NDArray[np.float64],
-                V_gates:NDArray[np.float64], x_dot:int, y_dot:int,
-                include_excited:bool=True, include_converged=False) -> CSDOutput:
+             V_x:NDArray[np.float64], V_y:NDArray[np.float64],
+             V_gates:NDArray[np.float64], x_dot:int, y_dot:int,
+             numerics:simulation.NumericsParameters|None=None,
+             include_excited:bool=True, include_converged=False) -> CSDOutput:
     '''
-    Calculates a 2D charge-stability diagram, varying plunger voltages on
+    Calculates a charge-stability diagram, varying plunger voltages on
     2 dots and keeping all other gates constant.
 
     Parameters
@@ -596,16 +651,24 @@ def calc_csd(n_dots:int, physics:simulation.PhysicsParameters,
         The number of dots in the device.
     physics : PhysicsParameters
         The physical parameters of the device to simulate.
-    V_x_min, V_x_max, N_V_x: float, float, int
-        The mesh points along the x-axis will be taken from ``np.linspace(V_x_min, V_x_max, N_v_x)``.
-    V_y_min, V_y_max, N_V_y: float, float, int
-        The mesh points along the y-axis will be taken from ``np.linspace(V_y_min, V_y_max, N_v_y)``.
-    V_gates: list[float]
-        A list of length `n_dots` giving the voltages of each of the
-        plunger gates (not barrier gates).
-    x_dot, y_dot: int
-        Integers between 0 and (n_dots - 1) inclusive, denoting the dots
-        whose corresponding gate voltages are plotted on the x- or y-axes
+    V_x, V_y : ndarray[float]
+        The possible x- and y-coordinates of the pixels in the diagram.
+    V_gates : ndarray[float]
+        An array of length `n_dots` giving the voltages of each of the plunger
+        gates. This is relevant only for plunger gates whose voltages remain
+        constant over the whole diagram, and it contains values of the constant
+        voltages. For the two plunger gates corresponding to the x- and y-axes
+        (`x_dot` and `y_dot`), the value of `V_gates` is arbitrary.
+    x_dot, y_dot : int
+        Integers between 0 and (n_dots - 1) inclusive, denoting the indeces of
+        the dots whose gate voltages are plotted on the x- or y-axes.
+    numerics : NumericsParameters | None
+        The numeric parameters to be used during the simulation.
+    include_excited : bool
+        Whether to include excited state data for applying latching effects.
+    include_converged : bool
+        Whether to include data about whether the simulation properly converged
+        at each pixel. 
 
     Returns
     -------
@@ -624,7 +687,7 @@ def calc_csd(n_dots:int, physics:simulation.PhysicsParameters,
     N_v_x = len(V_x)
     N_v_y = len(V_y)
 
-    csd_out = CSDOutput(physics=physics, V_x_vec=V_x, V_y_vec=V_y,
+    csd_out = CSDOutput(physics=physics, V_x=V_x, V_y=V_y,
                         x_gate=x_dot, y_gate=y_dot, V_gates=V_gates,
                         sensor=np.zeros((N_v_x, N_v_y, len(phys.sensors)), dtype=np.float32),
                         are_dots_occupied=np.full((N_v_x, N_v_y, n_dots), False, dtype=np.bool_),
@@ -650,7 +713,7 @@ def calc_csd(n_dots:int, physics:simulation.PhysicsParameters,
             phys.effective_peaks = eff_peaks
             V = simulation.calc_V(phys.gates, phys.x, 0, 0, eff_peaks) 
             phys.V = V
-            tf = simulation.ThomasFermi(phys)
+            tf = simulation.ThomasFermi(phys, numerics=numerics)
             tf_out = tf.run_calculations(n_guess=n_guess)
             n_guess = tf.n
             csd_out.are_dots_occupied[i,j,:] = tf_out.are_dots_occupied
@@ -678,30 +741,35 @@ def calc_csd(n_dots:int, physics:simulation.PhysicsParameters,
     return csd_out
     
 
-
 def calc_2d_csd(physics:simulation.PhysicsParameters,
                 V_x:NDArray[np.float64], V_y:NDArray[np.float64],
+                numerics:simulation.NumericsParameters|None=None,
                 include_excited:bool=True, include_converged=False) -> CSDOutput:
     '''
-    Calculates a 2D charge-stability diagram, varying plunger voltages on
-    2 dots and keeping all other gates constant.
+    Calculates a charge-stability diagram for the case where there are only
+    two dots.
 
     Parameters
     ----------
     physics : PhysicsParameters
         The physical parameters of the device to simulate.
-    V_x_min, V_x_max, N_V_x: float, float, int
-        The mesh points along the x-axis will be taken from ``np.linspace(V_x_min, V_x_max, N_v_x)``.
-    V_y_min, V_y_max, N_V_y: float, float, int
-        The mesh points along the y-axis will be taken from ``np.linspace(V_y_min, V_y_max, N_v_y)``.
-
+    V_x, V_y : ndarray[float]
+        The possible x- and y-coordinates of the pixels in the diagram.
+    numerics : NumericsParameters | None
+        The numeric parameters to be used during the simulation.
+    include_excited : bool
+        Whether to include excited state data for applying latching effects.
+    include_converged : bool
+        Whether to include data about whether the simulation properly converged
+        at each pixel. 
+    
     Returns
     -------
     CSDOutput
         A ``CSDOutput`` object wrapping the results of the computation.
     '''
-    return calc_csd(2, physics, V_x, V_y, np.array([0,0]), 0, 1, include_excited=include_excited, include_converged=include_converged)
-
+    return calc_csd(2, physics, V_x, V_y, np.array([0,0]), 0, 1, numerics=numerics,
+                    include_excited=include_excited, include_converged=include_converged)
 
 
 def calc_transitions(dot_charges:NDArray[np.int_], are_dots_combined:NDArray[np.bool_]) \
@@ -757,53 +825,58 @@ def calc_transitions(dot_charges:NDArray[np.int_], are_dots_combined:NDArray[np.
 
 
 
-
 @dataclass(kw_only=True)
 class RaysOutput:
     '''
-    Output of charge stability diagram calculations. Some attributes may be ``None``
+    Output of ray data calculations. Some attributes may be ``None``
     depending on which quantities are calculated.
-
-    Output values are stored in arrays such that the output for a property at point
-    ``(V_x_vec[i], V_y_vec[j])`` is given by ``property[i][j]``.
 
     Attributes
     ----------
-    
     physics : PhysicsParameters
-        The set of physics parameters used in the simulation. 
-    V_x_vec, V_y_vec : ndarray[float]
-        Arrays of voltage values along the x- and y-axes.
-    x_gate, y_gate : int
-        The dot numbers of the dots whose gate voltages are plotted on the x- or y-axes.
-    V_gates : ndarray[float]
-        An array of length `n_dots` giving the voltages of each of the
-        plunger gates (not barrier gates).
+        The set of physics parameters used in the simulation.
+    centers : ndarray[float]
+        An array with shape ``(n_centers, n_dots)`` indicating the points from
+        which rays should start.
+    rays : ndarray[float]
+        An array with shape ``(n_rays, n_dots)`` indicating the direction and
+        length of from each ray that extends from a single center point.
+    resolution : int
+        The number of points per ray to simulate.
     sensor : ndarray[float]
-        The Coulomb potential at each sensor.
+        An array with shape ``(n_centers, n_rays, resolution, n_sensors)``
+        giving the Coulomb potential at each point at a specific sensor.
     are_dots_occupied : ndarray[bool]
-        An array of booleans, one for each dot, indicating whether each dot is occupied.    
+        An array with shape ``(n_centers, n_rays, resolution, n_dots)``, indicating whether
+        each dot is occupied at each point.
     are_dots_combined : ndarray[bool]
-        An array of booleans, one for each internal barrier,
-        indicating whether the dots on each side are combined together
-        (i.e. the barrier is too low).
+        An array with shape ``(n_centers, n_rays, resolution, n_dots-1)``, indicating
+        at each point, whether the dots on each side of an
+        internal barrier are combined together (i.e. the barrier is too low).
     dot_charges : ndarray[int]
-        An array of integers, one for each dot, indicating the total number
-        of charges in each dot. In the case of combined dots, the
-        total number of charges will be entered in the left-most dot,
-        with the other dots padded with zeros.
-    converged : ndarray[bool]
-        Whether the calculation of n(x) properly converged.
-    dot_transitions : ndarray[bool]
-        Whether a transition is present at each dot.
-    are_transitions_combined : ndarray[bool]
-        Whether a combined transition is present on either side of each barrier.
+        An array with shape ``(n_centers, n_rays, resolution, n_dots)``, indicating the
+        total number of charges in each dot at each point.
+        In the case of combined dots, the total number of charges will be
+        entered in the left-most spot, with the other spots padded with zeros.
+    converged : ndarray[bool] | None
+        An array with shape ``(n_centers, n_rays, resolution)``, indicating whether the
+        calculation of n(x) properly converged at each point.
+    dot_transitions : ndarray[bool] | None
+        An array with shape ``(n_centers, n_rays, resolution, n_dots)``, indicating whether
+        a transition in each dot occurs at each pisel in the diagram.
+    are_transitions_combined : ndarray[bool] | None
+        An array with shape ``(n_centers, n_rays, resolution, n_dots-1)``, indicating at
+        each point, whether a transition occurs on a combined dot
+        comprised of dots on either side of each internal barrier.
+    excited_sensor : ndarray[float] | None
+        An array with shape ``(n_centers, n_rays, resolution, n_sensors)`` giving the
+        Coulomb potential at an excited state at each point at a specific sensor.
     '''
     physics:simulation.PhysicsParameters=field(default_factory=lambda:simulation.PhysicsParameters())
-    centers:NDArray[np.float64]=field(default_factory=lambda:np.zeros(0, dtype=np.float64)) # shape (n_centers, n_plungers)
-    rays:NDArray[np.float64]=field(default_factory=lambda:np.zeros(0, dtype=np.float64)) # shape (n_rays, n_plungers)
+    centers:NDArray[np.float64]=field(default_factory=lambda:np.zeros(0, dtype=np.float64))
+    rays:NDArray[np.float64]=field(default_factory=lambda:np.zeros(0, dtype=np.float64))
     resolution:int=0 # must be at least 2
-    sensor:NDArray[np.float32]=field(default_factory=lambda:np.zeros(0, dtype=np.float32)) # shape (n_centers, n_rays, resolution, n_sens)
+    sensor:NDArray[np.float32]=field(default_factory=lambda:np.zeros(0, dtype=np.float32))
     are_dots_occupied:NDArray[np.bool_]=field(default_factory=lambda:np.zeros(0, dtype=np.bool_))
     are_dots_combined:NDArray[np.bool_]=field(default_factory=lambda:np.zeros(0, dtype=np.bool_))
     dot_charges:NDArray[np.int_]=field(default_factory=lambda:np.zeros(0, dtype=np.int_))
@@ -929,21 +1002,31 @@ RaysOutput.excited_sensor = property(RaysOutput._get_excited_sensor, RaysOutput.
 
 def calc_rays(physics:simulation.PhysicsParameters, centers:NDArray[np.float64],
               rays:NDArray[np.float64], resolution:int,
-              include_excited:bool=True, include_converged=False) -> RaysOutput:
+              numerics:simulation.NumericsParameters|None=None,
+              include_excited:bool=False, include_converged=False) -> RaysOutput:
     '''
-    Calculates a 2D charge-stability diagram, varying plunger voltages on
-    2 dots and keeping all other gates constant.
+    Calculates ray data, varying multiple plunger voltages at once to move along
+    an arbitrary ray in voltage space.
 
     Parameters
     ----------
     physics : PhysicsParameters
         The physical parameters of the device to simulate.
-    centers : NDArray[np.float64]
-        shape (n_centers, n_plungers)
-    rays : NDArray[np.float64]
-        shape (n_rays, n_plungers)
+    centers : ndarray[float]
+        An array with shape ``(n_centers, n_dots)`` indicating the points from
+        which rays should start.
+    rays : ndarray[float]
+        An array with shape ``(n_rays, n_dots)`` indicating the direction and
+        length of from each ray that extends from a single center point.
     resolution : int
-        The number of points
+        The number of points per ray to simulate.
+    numerics : NumericsParameters | None
+        The numeric parameters to be used during the simulation.
+    include_excited : bool
+        Whether to include excited state data for applying latching effects.
+    include_converged : bool
+        Whether to include data about whether the simulation properly converged
+        at each pixel. 
 
     Returns
     -------
@@ -1003,7 +1086,7 @@ def calc_rays(physics:simulation.PhysicsParameters, centers:NDArray[np.float64],
                     phys.effective_peaks = eff_peaks
                     V = simulation.calc_V(phys.gates, phys.x, 0, 0, eff_peaks) 
                     phys.V = V
-                    tf = simulation.ThomasFermi(phys)
+                    tf = simulation.ThomasFermi(phys, numerics=numerics)
                     tf_out = tf.run_calculations(n_guess=n_guess)
                     n_guess = tf.n
                     rays_out.are_dots_occupied[c_i,r_i,i,:] = tf_out.are_dots_occupied
