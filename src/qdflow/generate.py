@@ -927,54 +927,6 @@ RaysOutput.excited_sensor = property(RaysOutput._get_excited_sensor, RaysOutput.
 
 
 
-def quasirandom_points(dim, min=None, max=None, n_start=0):
-    '''
-        Generates quasirandom points between min and max.
-        The first point returned by this generator will be initial + n_start * a,
-        shifted by a multiple of (max - min) so that it falls between min and max,
-        where a is the difference between consecutive points in the sequence
-        prior to the shift
-    '''
-    # phi_n is the solution to x^(n_dim+1) - x - 1 == 0
-    # see extremelearning.com.au/unreasonable-effectiveness-of-quasirandom-sequences/
-    phi_n = 2.
-    #converges after 20 iterations
-    for i in range(20): 
-        phi_n = pow(1+phi_n, 1/(dim+1)) 
-    
-    if min is None:
-        min = np.zeros(dim)
-    elif hasattr(min, '__len__'):
-        min = np.array(min)
-    else:
-        min = np.full(dim, min)
-    if max is None:
-        max = np.ones(dim)
-    elif hasattr(max, '__len__'):
-        max = np.array(max)
-    else:
-        max = np.full(dim, max)
-   
-    initial = (min + max) / 2
-
-    s = max - min
-    a = np.zeros(dim)
-    phi_pow = 1.
-    for i in range(dim):
-        phi_pow = phi_pow / phi_n
-        a[i] = s[i] * phi_pow
-
-    x = (((initial + n_start * a - min) / s) % 1) * s + min
-
-    while True:
-        yield tuple(x)
-        x = x + a
-        for i in range(dim):
-            if x[i] >= max[i]:
-                x[i] = x[i] - s[i]
-
-
-
 def calc_rays(physics:simulation.PhysicsParameters, centers:NDArray[np.float64],
               rays:NDArray[np.float64], resolution:int,
               include_excited:bool=True, include_converged=False) -> RaysOutput:
