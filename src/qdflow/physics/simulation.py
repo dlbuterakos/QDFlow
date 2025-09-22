@@ -870,7 +870,7 @@ class ThomasFermi:
     def __init__(
         self,
         physics: PhysicsParameters | dict[str, Any],
-        numerics: NumericsParameters | dict[str, Any] = {},
+        numerics: NumericsParameters | dict[str, Any] | None = None,
     ):
         self.physics: PhysicsParameters = (
             PhysicsParameters.from_dict(physics)
@@ -920,9 +920,11 @@ class ThomasFermi:
         """
 
         self.numerics: NumericsParameters = (
-            numerics.copy()
-            if isinstance(numerics, NumericsParameters)
-            else NumericsParameters.from_dict(numerics)
+            NumericsParameters() if numerics is None else (
+                numerics.copy()
+                if isinstance(numerics, NumericsParameters)
+                else NumericsParameters.from_dict(numerics)
+            )
         )
         """
         dict[str, Any]
