@@ -467,36 +467,36 @@ class NoiseGenerator:
         )
         for ind in np.ndindex(non_axis_shape):
             sd = (
-                stdev
-                if isinstance(stdev, float)
-                else stdev[tuple(ind[:axis]) + (slice(None),) + tuple(ind[axis:])]
+                stdev[tuple(ind[:axis]) + (slice(None),) + tuple(ind[axis:])]
+                if isinstance(stdev, np.ndarray)
+                else stdev
             ) / np.sqrt(2)
             mag = (
-                magnitude
-                if isinstance(magnitude, float)
-                else magnitude[tuple(ind[:axis]) + (slice(None),) + tuple(ind[axis:])]
+                magnitude[tuple(ind[:axis]) + (slice(None),) + tuple(ind[axis:])]
+                if isinstance(magnitude, np.ndarray)
+                else magnitude
             ) / 2
             rand_arr = self.rng.random(ax_len)
             norm_arr = self.rng.normal(0, sd, ax_len)
-            norm_start = self.rng.normal(0, (sd if isinstance(sd, float) else sd[0]))
+            norm_start = self.rng.normal(0, (sd[0] if isinstance(sd, np.ndarray) else sd))
             low_jump = rand_arr < low_p
             high_jump = rand_arr < high_p
             is_low = start_low[ind]
             noise = np.zeros(ax_len)
             current_val = (-1 if is_low else 1) * (
-                mag if isinstance(mag, float) else mag[0]
+                mag[0] if isinstance(mag, np.ndarray) else mag
             ) + norm_start
             for i in range(ax_len):
                 noise[i] = current_val
                 if is_low and low_jump[i]:
                     is_low = False
                     current_val = (
-                        mag if isinstance(mag, float) else mag[i]
+                        mag[i] if isinstance(mag, np.ndarray) else mag
                     ) + norm_arr[i]
                 elif not is_low and high_jump[i]:
                     is_low = True
                     current_val = (
-                        -(mag if isinstance(mag, float) else mag[i]) + norm_arr[i]
+                        -(mag[i] if isinstance(mag, np.ndarray) else mag) + norm_arr[i]
                     )
             output[tuple(ind[:axis]) + (slice(None),) + tuple(ind[axis:])] += noise
         return output

@@ -918,18 +918,18 @@ class SphericallyCorrelated(CorrelatedDistribution[float]):
     ) -> NDArray:
         if size is None:
             r = (
-                self.radius
-                if isinstance(self.radius, float)
-                else self.radius.draw(rng, size=None)
+                self.radius.draw(rng, size=None)
+                if isinstance(self.radius, Distribution)
+                else self.radius
             )
             x = rng.normal(0, 1, size=self.n)
             x_norm = np.sqrt(np.sum(x**2))
             return r * x / x_norm
         else:
             r_arr = (
-                np.full(size, self.radius)
-                if isinstance(self.radius, float)
-                else self.radius.draw(rng, size=size)
+                self.radius.draw(rng, size=size)
+                if isinstance(self.radius, Distribution)
+                else np.full(size, self.radius)
             )
             x_size = ((size,) if isinstance(size, int) else tuple(size)) + (self.n,)
             x = rng.normal(0, 1, size=x_size)
