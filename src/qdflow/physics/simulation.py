@@ -102,10 +102,10 @@ class GateParameters:
     """
 
     mean: float = 0
-    peak: float = 1
-    rho: float = 20
-    h: float = 60
-    screen: float = 40
+    peak: float = 0
+    rho: float = 15
+    h: float = 80
+    screen: float = 100
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> Self:
@@ -150,6 +150,7 @@ class GateParameters:
             A new ``GateParameters`` object with the same attribute values as ``self``.
         """
         return dataclasses.replace(self)
+
 
 
 @dataclass(kw_only=True)
@@ -242,33 +243,33 @@ class PhysicsParameters:
     """
 
     x: NDArray[np.float64] = field(
-        default_factory=lambda: np.linspace(-350, 350, 151, endpoint=True)
+        default_factory=lambda: np.linspace(-300, 300, 151, endpoint=True)
     )
     V: NDArray[np.float64] | None = None
     q: float = -1
     gates: list[GateParameters] = field(
         default_factory=lambda: [
-            GateParameters(mean=-200, peak=-6),
-            GateParameters(mean=-100, peak=3),
-            GateParameters(mean=0, peak=-4),
-            GateParameters(mean=100, peak=3),
-            GateParameters(mean=200, peak=-6),
+            GateParameters(mean=-200, peak=-7),
+            GateParameters(mean=-100, peak=7),
+            GateParameters(mean=0, peak=-5),
+            GateParameters(mean=100, peak=7),
+            GateParameters(mean=200, peak=-7),
         ]
     )
     effective_peaks: NDArray[np.float64] | None = None
     K_mat: NDArray[np.float64] | None = None
-    K_0: float = 30.0
-    sigma: float = 60.0
+    K_0: float = 5
+    sigma: float = 60
     g0_dx_K_plus_1_inv: NDArray[np.float64] | None = None
-    mu: float = 0
+    mu: float = .5
     V_L: float = -1e-2
     V_R: float = 1e-2
-    g_0: float = 0.075
-    beta: float = 232
-    kT: float = 0.0043
-    c_k: float = 2.9
-    sensors: NDArray[np.float64] = field(default_factory=lambda: np.array([[0, 50, 0]]))
-    screening_length: float = 40
+    g_0: float = 0.0065
+    beta: float = 100
+    kT: float = 0.01
+    c_k: float = 1.2
+    sensors: NDArray[np.float64] = field(default_factory=lambda: np.array([[0, -250, 0]]))
+    screening_length: float = 100
     WKB_coef: float = 0.089
     barrier_current: float = 1e-5
     short_circuit_current: float = 1e4
