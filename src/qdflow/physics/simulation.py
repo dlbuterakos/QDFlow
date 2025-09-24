@@ -362,12 +362,8 @@ class PhysicsParameters:
         dict[str, Any]
             A dict with values specified by the ``PhysicsParameters`` object.
         """
-        output = dataclasses.asdict(self)
-        out_gates = output["gates"]
-        for i in range(len(out_gates)):
-            out_gates[i] = out_gates[i].to_dict()
-        return output
-
+        return dataclasses.asdict(self)
+        
     def copy(self) -> Self:
         """
         Creates a deep copy of a ``PhysicsParameters`` object.
