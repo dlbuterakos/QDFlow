@@ -410,9 +410,14 @@ class NumericsParameters:
 
     Attributes
     ----------
-    calc_n_max_iterations : int
-        The maximum number of iterations to perfom when solving self-consistent
-        equations to calculate the particle density n(x).
+    calc_n_max_iterations_no_guess : int
+        The maximum number of iterations to perfom, if no initial guess for n(x)
+        is provided, when solving self-consistent equations to calculate the
+        particle density n(x).
+    calc_n_max_iterations_guess : int
+        The maximum number of iterations to perfom, if an initial guess for n(x)
+        is provided, when solving self-consistent equations to calculate the
+        particle density n(x).
     calc_n_rel_tol : float
         The relative tolerance to accept a solution for the particle density
         n(x). The calculation will terminate when the difference ``delta_n``
@@ -450,7 +455,8 @@ class NumericsParameters:
         to allow when creating the Markov graph.
     """
 
-    calc_n_max_iterations: int = 100
+    calc_n_max_iterations_no_guess: int = 500
+    calc_n_max_iterations_guess: int = 100
     calc_n_rel_tol: float = 1e-4
     calc_n_coulomb_steps: int = 1
     calc_n_use_combination_method: bool = True
@@ -1326,7 +1332,8 @@ class ThomasFermi:
         ConvergenceWarning
             If the process does not converge to the required tolerance within
             the specified number of iterations, given by ``self.numerics.calc_n_rel_tol``
-            and ``self.numerics.calc_n_max_iterations``.
+            and ``self.numerics.calc_n_max_iterations_guess`` or 
+            ``self.numerics.calc_n_max_iterations_no_guess``.
         """
         qV = self.V * self.physics.q
         K_mat = self.K_mat
@@ -1338,7 +1345,8 @@ class ThomasFermi:
 
         rel_tol = self.numerics.calc_n_rel_tol
         coulomb_steps = self.numerics.calc_n_coulomb_steps
-        max_iterations = self.numerics.calc_n_max_iterations
+        max_iterations = (self.numerics.calc_n_max_iterations_no_guess
+                if n_guess is None else self.numerics.calc_n_max_iterations_guess)
         use_combination_method = self.numerics.calc_n_use_combination_method
 
         # provide option to use a guess for n, phi to speed up computation
