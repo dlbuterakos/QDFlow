@@ -1740,7 +1740,7 @@ class ThomasFermi:
             to the derivative of the fermi distribution at ``E`` (in 1/meV).
         """
         kT = self.physics.kT
-        dfermi = scipy.special.expit(-E / kT) ** 2 * (1 / kT) * np.exp(-E / kT)
+        dfermi = scipy.special.expit(-E / kT) ** 2 * (-1 / kT) * np.exp(E / kT)
         return dfermi
 
     def _calc_weight(self, u: NDArray[np.int_], v: NDArray[np.int_]) -> float:
