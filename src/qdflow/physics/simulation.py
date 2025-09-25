@@ -943,7 +943,7 @@ class ThomasFermi:
         """
 
         # calculate g0_dx_K_plus_1_inv if not already specified
-        self.g0_dx_K_plus_1_inv: NDArray[np.float64] = np.array([])
+        self.g0_dx_K_plus_1_inv: NDArray[np.floating[Any]] = np.array([])
         if self.numerics.calc_n_use_combination_method:
             self.g0_dx_K_plus_1_inv = (
                 np.linalg.inv(
