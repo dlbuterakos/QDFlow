@@ -1,6 +1,7 @@
 import numpy as np
 import pytest
 from qdflow.physics import simulation
+import warnings
 
 # ----------------
 # Test Dataclasses
@@ -160,40 +161,263 @@ class TestModuleFunctions:
         val3 = simulation.calc_V_gate(gate3, 100, -7, 7)
         assert np.isclose(val3, val1)
 
+    @staticmethod
+    def test_calc_effective_peaks():
+        gates = [
+            simulation.GateParameters(mean=15, peak=1.3, rho=10, h=20, screen=40)
+        ]
+        eff_peaks = simulation.calc_effective_peaks(gates)
+        assert eff_peaks.shape == (1,)
+        assert np.isclose(eff_peaks[0], 1.3)
+        gates = [
+            simulation.GateParameters(mean=15, peak=1.3, rho=10, h=20, screen=40),
+            simulation.GateParameters(mean=65, peak=1.3, rho=10, h=20, screen=40),            
+        ]
+        eff_peaks = simulation.calc_effective_peaks(gates)
+        assert eff_peaks.shape == (2,)
+        assert eff_peaks[0] < 1.3
+        gates = [
+            simulation.GateParameters(mean=15, peak=1.3, rho=10, h=20, screen=40),
+            simulation.GateParameters(mean=65, peak=-1.3, rho=10, h=20, screen=40),            
+        ]
+        eff_peaks = simulation.calc_effective_peaks(gates)
+        assert eff_peaks.shape == (2,)
+        assert eff_peaks[0] > 1.3
 
+    @staticmethod
+    def test_calc_V():
+        gates = [
+            simulation.GateParameters(mean=15, peak=1.3, rho=10, h=20, screen=40),
+            simulation.GateParameters(mean=65, peak=-1.3, rho=10, h=20, screen=40),            
+        ]
+        x = np.linspace(0, 100, 21)
+        v = simulation.calc_V(gates, x, 0, 0)
+        assert v.shape == (21,)
+        assert v[13] < v[3]
 
-#     @staticmethod
-#     def test_calc_effective_peaks_shape():
-#         gates = [
-#             simulation.GateParameters(mean=0, peak=1, rho=2, h=3, screen=4),
-#             simulation.GateParameters(mean=1, peak=2, rho=3, h=4, screen=5),
-#         ]
-#         eff_peaks = simulation.calc_effective_peaks(gates)
-#         assert eff_peaks.shape == (2,)
+    @staticmethod
+    def test_is_transition():
+        dc1 = np.array([1, 0])
+        adc1 = np.array([False])
+        dc2 = np.array([2, 0])
+        adc2 = np.array([False])
+        is_tr, is_tr_comb = simulation.is_transition(dc1, adc1, dc2, adc2)
+        assert is_tr.shape == (2,)
+        assert is_tr_comb.shape == (1,)
+        assert np.all(is_tr == [True, False])
+        assert np.all(is_tr_comb == [False])
 
-# def test_calc_V_shape():
-#     gates = [
-#         simulation.GateParameters(mean=0, peak=1, rho=2, h=3, screen=4),
-#         simulation.GateParameters(mean=1, peak=2, rho=3, h=4, screen=5),
-#     ]
-#     x = np.linspace(-1, 1, 5)
-#     v = simulation.calc_V(gates, x, 0, 0)
-#     assert v.shape == (5,)
+        dc1 = np.array([1, 2, 3])
+        adc1 = np.array([False, False])
+        dc2 = np.array([2, 1, 3])
+        adc2 = np.array([False, False])
+        is_tr, is_tr_comb = simulation.is_transition(dc1, adc1, dc2, adc2)
+        assert is_tr.shape == (3,)
+        assert is_tr_comb.shape == (2,)
+        assert np.all(is_tr == [True, True, False])
+        assert np.all(is_tr_comb == [False, False])
 
-# def test_ThomasFermi_basic_run():
-#     phys = simulation.PhysicsParameters()
-#     tf = simulation.ThomasFermi(phys)
-#     n = tf.calc_n()
-#     assert n.shape == phys.x.shape
-#     assert isinstance(tf.converged, bool)
+        dc1 = np.array([2, 2])
+        adc1 = np.array([False])
+        dc2 = np.array([4, 0])
+        adc2 = np.array([True])
+        is_tr, is_tr_comb = simulation.is_transition(dc1, adc1, dc2, adc2)
+        assert np.all(is_tr == [False, False])
+        assert np.all(is_tr_comb == [False])
 
-# def test_is_transition_basic():
-#     dc1 = np.array([1, 0])
-#     adc1 = np.array([False])
-#     dc2 = np.array([2, 0])
-#     adc2 = np.array([False])
-#     is_tr, is_tr_comb = simulation.is_transition(dc1, adc1, dc2, adc2)
-#     assert is_tr.shape == (2,)
-#     assert is_tr_comb.shape == (1,)
-#     assert np.any(is_tr)
+        dc1 = np.array([2, 2])
+        adc1 = np.array([False])
+        dc2 = np.array([5, 0])
+        adc2 = np.array([True])
+        is_tr, is_tr_comb = simulation.is_transition(dc1, adc1, dc2, adc2)
+        assert np.all(is_tr == [True, True])
+        assert np.all(is_tr_comb == [True])
+
+        dc1 = np.array([4, 0, 2])
+        adc1 = np.array([True, False])
+        dc2 = np.array([2, 4, 0])
+        adc2 = np.array([False, True])
+        is_tr, is_tr_comb = simulation.is_transition(dc1, adc1, dc2, adc2)
+        assert np.all(is_tr == [False, False, False])
+        assert np.all(is_tr_comb == [False, False])
+
+        dc1 = np.array([4, 0, 1])
+        adc1 = np.array([True, False])
+        dc2 = np.array([2, 4, 0])
+        adc2 = np.array([False, True])
+        is_tr, is_tr_comb = simulation.is_transition(dc1, adc1, dc2, adc2)
+        assert np.all(is_tr == [True, True, True])
+        assert np.all(is_tr_comb == [True, True])
+
+        dc1 = np.array([4, 0, 2])
+        adc1 = np.array([True, False])
+        dc2 = np.array([5, 0, 1])
+        adc2 = np.array([True, False])
+        is_tr, is_tr_comb = simulation.is_transition(dc1, adc1, dc2, adc2)
+        assert np.all(is_tr == [True, True, True])
+        assert np.all(is_tr_comb == [True, False])
+
+# ---------------------------
+# Test ThomasFermi simulation
+# ---------------------------
+
+class TestThomasFermi:
+
+    @staticmethod
+    def test_calc_n():
+        x = np.linspace(-300,300,51)
+        phys = simulation.PhysicsParameters(x=x)
+        tf = simulation.ThomasFermi(phys)
+        n = tf._calc_n()
+        assert n.shape == (len(x),)
+        assert np.all(n >= 0)
+
+        x = np.linspace(-300,300,51)
+        phys = simulation.PhysicsParameters(x=x, K_0=0)
+        V = simulation.calc_V(phys.gates, x, 0, 0)
+        phys.V = V
+        tf = simulation.ThomasFermi(phys)
+        n = tf._calc_n()
+        de = phys.mu - phys.q * phys.V
+        n_exact = (phys.g_0 / phys.beta) * np.where(de > 0,
+            phys.beta * de + np.log(1 + np.exp(phys.beta * np.where(de > 0, -de, 0))),
+            np.log(1 + np.exp(phys.beta * np.where(de <= 0, de, 0)))
+        )
+        assert np.allclose(n, n_exact)
+
+        x = np.linspace(-300,300,51)
+        phys = simulation.PhysicsParameters(x=x, K_0=10, g_0=.007, beta=1, mu=-20)
+        V = 4 * phys.q * np.cos(2*np.pi*x/250)
+        phys.V = V
+        tf = simulation.ThomasFermi(phys)
+        n = tf._calc_n()
+        assert np.all(n >= 0)
+        assert np.all(n < 1e-5)
+
+    @staticmethod
+    def test_calc_n_convergence_warning():
+        x = np.linspace(-300,300,51)
+        phys = simulation.PhysicsParameters(x=x, g_0=.01, K_0=1000, sigma=20, beta=100)
+        numer = simulation.NumericsParameters(calc_n_max_iterations_no_guess=50,
+                                              calc_n_rel_tol=1e-4)
+        tf = simulation.ThomasFermi(phys, numerics=numer)
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            n = tf._calc_n()
+            assert len(w) == 1
+            assert issubclass(w[0].category, simulation.ConvergenceWarning)
+            assert tf.converged == False
+
+        x = np.linspace(-300,300,51)
+        phys = simulation.PhysicsParameters(x=x, g_0=.001, K_0=1, sigma=20, beta=100)
+        numer = simulation.NumericsParameters(calc_n_max_iterations_no_guess=200,
+                                              calc_n_rel_tol=1e-4)
+        tf = simulation.ThomasFermi(phys, numerics=numer)
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            n = tf._calc_n()
+            assert len(w) == 0
+            assert tf.converged == True
+
+    @staticmethod
+    def test_calc_islands_and_barriers():
+        x = np.linspace(-300,300,20)
+        phys = simulation.PhysicsParameters(x=x)
+        numer = simulation.NumericsParameters(island_relative_cutoff=.1)
+        tf = simulation.ThomasFermi(phys, numerics=numer)
+        tf.n = np.array([.0050, .01,  .02,  .033, 2.4, 5.5, 6,   3.7,  2.8,  1.9,
+                         .010,  .011, .012, 2.3,  4.4, 4.5, 2.6, .017, .008, .009])
+        tf._calc_islands_and_barriers()
+        isl = tf.islands
+        bar = tf.barriers
+        assert np.all(isl == [[4,10], [13,17]])
+        assert np.all(bar == [[0,4], [10,13], [17,20]])
+
+    @staticmethod
+    def test_calc_charges():
+        x = np.linspace(-300,300,20)
+        delta_x = 600 / (20-1)
+        phys = simulation.PhysicsParameters(x=x)
+        tf = simulation.ThomasFermi(phys)
+        tf.n = np.array([.01, .01, .01,  .01, 2, 3, 4,  5,  2,  2,
+                         .01, .01, .01, 2,  4, 4, 2, .01, .01, .01])
+        tf.islands = np.array([[4,10], [13,17]], dtype=np.int_)
+        ch = tf._calc_charges()
+        assert np.allclose(ch, delta_x * np.array([18, 12]))
+        
+    @staticmethod
+    def test_calc_charge_centers():
+        x = np.linspace(-300,300,20)
+        phys = simulation.PhysicsParameters(x=x)
+        tf = simulation.ThomasFermi(phys)
+        tf.n = np.array([.01, .01, .01, .01, 20, 7, 1, 3, 3, 1,
+                         .01, .01, .01, 2, 4, 4, 2, .01, .01, .01])
+        tf.islands = np.array([[4,10], [13,17]], dtype=np.int_)
+        tf._calc_charges()
+        chc = tf._calc_charge_centers()
+        assert np.allclose(chc, [x[5], (x[14]+x[15])/2])
+
+    @staticmethod
+    def test_calc_inv_cap_matrix():
+        x = np.linspace(-300,300,20)
+        phys = simulation.PhysicsParameters(x=x)
+        tf = simulation.ThomasFermi(phys)
+        tf.n = np.array([.01, .01, .01, .01, 20, 7, 1, 3, 3, 1,
+                         .01, .01, .01, 2, 4, 4, 2, .01, .01, .01])
+        tf.islands = np.array([[4,10], [13,17]], dtype=np.int_)
+        tf._calc_charges()
+        icm = tf._calc_inv_cap_matrix()
+        assert icm.shape == (2,2)
+        assert np.allclose(icm, icm.T)
+        assert np.all(icm >= 0)
+
+    @staticmethod
+    def test_calc_cap_energy():
+        phys = simulation.PhysicsParameters()
+        tf = simulation.ThomasFermi(phys)
+        tf.inv_cap_matrix = np.array([[20,10], [10,30]])
+        tf.charges = np.array([2.4, 3.4])
+        nvec1 = np.array([2,3])
+        e1 = tf._calc_cap_energy(nvec1)
+        nvec2 = np.array([2,4])
+        e2 = tf._calc_cap_energy(nvec2)
+        nvec3 = np.array([3,3])
+        e3 = tf._calc_cap_energy(nvec3)
+        assert np.isclose(e1, 11.2)
+        assert np.isclose(e2, 9.2)
+        assert np.isclose(e3, 7.2)
+
+    @staticmethod
+    def test_calc_stable_config():
+        phys = simulation.PhysicsParameters()
+        tf = simulation.ThomasFermi(phys)
+        tf.inv_cap_matrix = np.array([[20,10], [10,30]])
+        tf.charges = np.array([2.4, 3.4])
+        sc = tf._calc_stable_config()
+        assert np.all(sc == [3,3])
+
+    @staticmethod
+    def test_fermi():
+        phys = simulation.PhysicsParameters(kT=.1)
+        tf = simulation.ThomasFermi(phys)
+        val = tf._fermi(0)
+        arr = tf._fermi(np.array([-.1,0,.1]))
+        assert isinstance(val, float)
+        assert arr.shape == (3,)
+        assert np.allclose(arr, [np.e/(1+np.e), .5, 1/(1+np.e)])
+
+    @staticmethod
+    def test_dfermi():
+        phys = simulation.PhysicsParameters(kT=.1)
+        tf = simulation.ThomasFermi(phys)
+        val = tf._dfermi(0)
+        e_arr = np.array([-.1,0,.1])
+        arr = tf._dfermi(e_arr)
+        a1 = tf._fermi(e_arr)
+        eps = 1e-5
+        a2 = tf._fermi(e_arr + eps)
+        approx = (a2 - a1) / eps
+        assert isinstance(val, float)
+        assert arr.shape == (3,)
+        assert np.allclose(arr, approx, rtol=.01)
 
