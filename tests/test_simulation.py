@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 from qdflow.physics import simulation
 import warnings
+import networkx
 
 # ----------------
 # Test Dataclasses
@@ -420,4 +421,130 @@ class TestThomasFermi:
         assert isinstance(val, float)
         assert arr.shape == (3,)
         assert np.allclose(arr, approx, rtol=.01)
+
+    @staticmethod
+    def test_calc_qV_TF():
+        x = np.linspace(-300,300,51)
+        phys = simulation.PhysicsParameters(x=x, K_0=0, q=-1)
+        V = simulation.calc_V(phys.gates, x, 0, 0)
+        phys.V = V
+        tf = simulation.ThomasFermi(phys)
+        de = phys.mu - phys.q * phys.V
+        tf.n = (phys.g_0 / phys.beta) * np.where(de > 0,
+            phys.beta * de + np.log(1 + np.exp(phys.beta * np.where(de > 0, -de, 0))),
+            np.log(1 + np.exp(phys.beta * np.where(de <= 0, de, 0)))
+        )
+        qvtf = tf._calc_qV_TF()
+        assert qvtf.shape == V.shape
+        assert np.allclose(qvtf, phys.q * phys.V)
+
+        x = np.array([-1,0,1])
+        K_mat = np.array([[3,2,1],[2,3,2],[1,2,3]])
+        V = np.array([30,20,10])
+        n = np.array([5,2,1])
+        phys = simulation.PhysicsParameters(x=x, K_mat=K_mat, q=-1, V=V)
+        tf = simulation.ThomasFermi(phys)
+        tf.n = n
+        qvtf = tf._calc_qV_TF()
+        assert np.allclose(qvtf, [-10, -2, 2])        
+
+    @staticmethod
+    def test_calc_WKB_prob():
+        x = np.linspace(-300,300,21)
+        dx = 600 / (21-1)
+        V = -np.cos(2*np.pi*x/300)
+        phys = simulation.PhysicsParameters(x=x, q=-1, K_0=0, V=V, mu=0)
+        tf = simulation.ThomasFermi(phys)
+        tf.qV_TF = -V
+        tf.islands = np.array([[3,8], [13,18]], dtype=np.int_)
+        tf.barriers = np.array([[0,3], [8,13], [18,21]], dtype=np.int_)
+        tf.is_short_circuit = False
+        up_bound = phys.v_F / 2 / dx / 5
+        wkb = tf._calc_WKB_prob()
+        assert wkb.shape == (3,)
+        assert np.all(wkb >= 0)
+        assert np.all(wkb <= up_bound)
+        
+    @staticmethod
+    def test_calc_weight():
+        phys = simulation.PhysicsParameters(V_L=-10, V_R=10, q=-1, mu=0, kT=20)
+        tf = simulation.ThomasFermi(phys)
+        tf.islands = np.array([[3,8], [13,18], [23,28]], dtype=np.int_)
+        tf.barriers = np.array([[0,3], [8,13], [18,23], [28,31]], dtype=np.int_)
+        tf.is_short_circuit = False
+        tf.p_WKB = np.array([1,2,3,4])
+        tf.inv_cap_matrix = np.array([[20,10,3], [10,30,7], [3,7,15]])
+        tf.charges = np.array([2.4, 3.4, 1.8])
+
+        w = tf._calc_weight(np.array([2,3,4]), np.array([2,3,4]))
+        assert w == 0
+        w = tf._calc_weight(np.array([2,3,4]), np.array([3,3,3]))
+        assert w == 0
+        w = tf._calc_weight(np.array([2,3,4]), np.array([1,2,4]))
+        assert w == 0
+        w = tf._calc_weight(np.array([2,3,4]), np.array([2,5,2]))
+        assert w == 0
+        w = tf._calc_weight(np.array([2,3,4]), np.array([4,3,4]))
+        assert w == 0
+        w = tf._calc_weight(np.array([2,3,4]), np.array([2,4,4]))
+        assert w == 0
+        w = tf._calc_weight(np.array([2,3,4]), np.array([3,2,3]))
+        assert w == 0
+        w = tf._calc_weight(np.array([2,3,4]), np.array([1,5,3]))
+        assert w == 0
+
+        w = tf._calc_weight(np.array([2,3,4]), np.array([1,3,4]))
+        assert w > 0
+        w = tf._calc_weight(np.array([2,3,4]), np.array([3,3,4]))
+        assert w > 0
+        w = tf._calc_weight(np.array([2,3,4]), np.array([2,3,3]))
+        assert w > 0
+        w = tf._calc_weight(np.array([2,3,4]), np.array([2,3,5]))
+        assert w > 0
+        w = tf._calc_weight(np.array([2,3,4]), np.array([1,4,4]))
+        assert w > 0
+        w = tf._calc_weight(np.array([2,3,4]), np.array([3,2,4]))
+        assert w > 0
+        w = tf._calc_weight(np.array([2,3,4]), np.array([2,4,3]))
+        assert w > 0
+        w = tf._calc_weight(np.array([2,3,4]), np.array([2,2,5]))
+        assert w > 0
+
+    @staticmethod
+    def test_create_graph():
+        phys = simulation.PhysicsParameters(V_L=-10, V_R=10, q=-1, mu=0, kT=1)
+        numer = simulation.NumericsParameters(create_graph_max_changes=2)
+        tf = simulation.ThomasFermi(phys, numerics=numer)
+        tf.islands = np.array([[3,8], [13,18], [23,28]], dtype=np.int_)
+        tf.barriers = np.array([[0,3], [8,13], [18,23], [28,31]], dtype=np.int_)
+        tf.p_WKB = np.array([1,2,3,4])
+        tf.inv_cap_matrix = np.array([[20,10,3], [10,30,7], [3,7,15]])
+        tf.charges = np.array([2.4, 3.4, 0.3])
+        tf.island_charges = [2, 3, 0]
+        G = tf._create_graph()
+        nodes = G.nodes
+        assert (2,3,0) in nodes
+        assert (2,3,1) in nodes
+        assert (2,5,0) in nodes
+        assert (1,2,0) in nodes
+        assert (3,2,0) in nodes
+        assert (2,3,-1) not in nodes
+        assert (5,3,0) not in nodes
+        assert (3,2,1) not in nodes
+        
+    @staticmethod
+    def test_calc_stable_dist():
+        phys = simulation.PhysicsParameters()
+        tf = simulation.ThomasFermi(phys)
+        G = networkx.DiGraph()
+        G.add_node((0,))
+        G.add_node((1,))
+        G.add_edge((0,), (1,), weight=1)
+        G.add_edge((1,), (0,), weight=2)
+        tf.G = G
+        dist = tf._calc_stable_dist()
+        assert dist.shape == (2,)
+        assert np.isclose(dist[0], 2*dist[1])
+        assert np.isclose(dist[0]+dist[1], 1)
+
 
