@@ -1885,13 +1885,10 @@ class ThomasFermi:
 
         # add nodes to graph
         for delta in deltas:
-            self.G.add_node(tuple(np.array(self.start_node) + delta))
-
-        # Check for negative num of electrons
-        for node in list(self.G.nodes()):
-            for node_val in list(node):
-                if node_val < 0:
-                    self.G.remove_node(node)
+            node = np.array(self.start_node) + delta
+            # Check for negative num of electrons
+            if np.all(node >= 0):
+                self.G.add_node(tuple(node))
 
         for x in list(self.G.nodes()):
             for y in list(self.G.nodes()):
