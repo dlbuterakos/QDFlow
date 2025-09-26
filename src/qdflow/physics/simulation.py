@@ -1376,7 +1376,7 @@ class ThomasFermi:
         self.converged = converged
         return self.n
 
-    def _calc_qV_TF(self):
+    def _calc_qV_TF(self) -> NDArray[np.float64]:
         """
         Calculates the Thomas-Fermi potential (in meV),
         equal to ``q*V + dot(K_mat,n)*delta_x``.
@@ -1390,6 +1390,7 @@ class ThomasFermi:
             equal to ``q*V + dot(K_mat,n)*delta_x``.
         """
         self.qV_TF = self.physics.q * self.V + np.dot(self.K_mat, self.n) * self.delta_x
+        return self.qV_TF
 
     def _calc_islands_and_barriers(self) -> NDArray[np.int_]:
         """
