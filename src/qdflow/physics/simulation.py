@@ -1723,6 +1723,7 @@ class ThomasFermi:
         kT = self.physics.kT
         return scipy.special.expit(-E / kT)
 
+    # note: This function is unused
     def _dfermi(self, E: NDArray[np.float64] | float) -> NDArray[np.float64] | float:
         """
         Calculates the derivative (in 1/meV) of the fermi distribution at a given
@@ -1792,13 +1793,11 @@ class ThomasFermi:
 
         if num_isls == 1:
             if diff[0] == 1:
-                weight = self.p_WKB[0] * self._fermi(E_v - E_u - mu_L) + self.p_WKB[
-                    1
-                ] * self._fermi(E_v - E_u - mu_R)
+                weight = self.p_WKB[0] * self._fermi(E_v - E_u - mu_L) \
+                       + self.p_WKB[1] * self._fermi(E_v - E_u - mu_R)
             elif diff[0] == -1:
-                weight = self.p_WKB[0] * (
-                    1 - self._fermi(E_u - E_v - mu_L)
-                ) + self.p_WKB[1] * (1 - self._fermi(E_u - E_v - mu_R))
+                weight = self.p_WKB[0] * (1 - self._fermi(E_u - E_v - mu_L)) \
+                       + self.p_WKB[1] * (1 - self._fermi(E_u - E_v - mu_R))
             else:
                 weight = 0.0
         # Multi-island handling
