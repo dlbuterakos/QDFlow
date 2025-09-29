@@ -2364,13 +2364,8 @@ class ThomasFermi:
                 else 0
             )
             c_dot_regions_idx[d, 1] = (
-                (
-                    np.argmin(
-                        np.where(
-                            c_dot_regions[d, 1] <= x, x - c_dot_regions[d, 1], np.inf
-                        )
-                    )
-                    + 1
+                1 + np.argmin(
+                    np.where(c_dot_regions[d, 1] <= x, x - c_dot_regions[d, 1], np.inf)
                 )
                 if c_dot_regions[d, 1] < x[-1]
                 else len(x)
