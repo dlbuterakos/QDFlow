@@ -2078,10 +2078,7 @@ class ThomasFermi:
         def calc_single_sensor(pos):
             (sx, sy, sz) = pos
             ss = np.sqrt(sy**2 + sz**2)
-            sensor_scale = (
-                self.physics.K_0 / ss
-                * np.exp(-ss / self.physics.screening_length)
-            )
+            sensor_scale = np.exp(-ss / self.physics.screening_length) / ss
             output = 0
             # calculate field at sensor due to charge islands
             for i in range(len(self.islands)):
@@ -2090,10 +2087,8 @@ class ThomasFermi:
                 x_i = self.physics.x[self.islands[i, 0] : self.islands[i, 1]]
                 r = np.sqrt((sx - x_i) ** 2 + sy**2 + sz**2)
                 output += (
-                    (self.physics.q * self.physics.K_0 * island_charges[i])
-                    / sensor_scale
-                    * np.sum(n_i * np.exp(-r / self.physics.screening_length) / r)
-                    / n_sum
+                    (self.physics.q * island_charges[i]) / sensor_scale
+                    * np.sum(n_i * np.exp(-r / self.physics.screening_length) / r) / n_sum
                 )
             return output
 
