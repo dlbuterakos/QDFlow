@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 from qdflow.physics import simulation
 import warnings
-import networkx
+import networkx # type: ignore[import-untyped]
 
 # ----------------
 # Test Dataclasses
@@ -547,4 +547,252 @@ class TestThomasFermi:
         assert np.isclose(dist[0], 2*dist[1])
         assert np.isclose(dist[0]+dist[1], 1)
 
+    @staticmethod
+    def test_calc_graph_charge():
+        phys = simulation.PhysicsParameters()
+        tf = simulation.ThomasFermi(phys)
+        tf.islands = np.array([[10,20]])
+        G = networkx.DiGraph()
+        G.add_node((0,))
+        G.add_node((1,))
+        G.add_edge((0,), (1,), weight=1)
+        G.add_edge((1,), (0,), weight=3)
+        tf.G = G
+        tf.dist = np.array([.75,.25])
+        gc = tf._calc_graph_charge()
+        assert gc == (0,)
+        
+    @staticmethod
+    def test_calc_graph_current():
+        phys = simulation.PhysicsParameters(q=-1, V_L=0, mu=0, kT=1)
+        tf = simulation.ThomasFermi(phys)
+        tf.islands = np.array([[10,20], [30,40]])
+        G = networkx.DiGraph()
+        G.add_node((0,1))
+        G.add_node((1,0))
+        G.add_node((0,0))
+        G.add_edge((1,0), (0,0), weight=1)
+        G.add_edge((0,0), (1,0), weight=3)
+        G.add_edge((0,1), (1,0), weight=1)
+        G.add_edge((1,0), (0,1), weight=3)
+        G.add_edge((0,1), (0,0), weight=3)
+        G.add_edge((0,0), (0,1), weight=1)
+        tf.G = G
+        tf.dist = np.array([1,1,1])/3
+        tf.inv_cap_matrix = np.array([[10,5], [5,10]])
+        tf.charges = np.array([.4, .4])
+        tf.p_WKB = np.array([.5,.5,.5])
+        gc = tf._calc_graph_current()
+        assert np.isclose(gc, 2/3)
 
+    @staticmethod
+    def test_calc_current():
+        phys = simulation.PhysicsParameters(q=-1, V_L=0, V_R=0, mu=0, kT=1)
+        numer = simulation.NumericsParameters(create_graph_max_changes=1)
+        tf = simulation.ThomasFermi(phys, numerics=numer)
+        tf.islands = np.array([[3,8], [13,18]], dtype=np.int_)
+        tf.barriers = np.array([[0,3], [8,13], [18,21]], dtype=np.int_)
+        tf.is_short_circuit = False
+        tf.p_WKB = np.array([1,1,1])
+        tf.inv_cap_matrix = np.array([[1,0], [0,1]])
+        tf.charges = np.array([.2, .2])
+        tf.island_charges = [0, 0]
+        cur = tf._calc_current()
+        assert np.isclose(cur, 0., atol=1e-6)
+
+    @staticmethod
+    def test_count_transitions():
+        phys = simulation.PhysicsParameters()
+        numer = simulation.NumericsParameters(count_transitions_sigma=.01, count_transitions_eps=.5)
+        tf = simulation.ThomasFermi(phys, numerics=numer)
+        tf.islands = np.array([[10,20]])
+        G = networkx.DiGraph()
+        G.add_node((0,))
+        G.add_node((1,))
+        G.add_node((2,))
+        G.add_edge((0,), (1,), weight=.6)
+        G.add_edge((1,), (0,), weight=.61)
+        G.add_edge((1,), (2,), weight=2.3)
+        G.add_edge((2,), (1,), weight=2.7)
+        tf.G = G
+        tf.dist = np.array([.2,.7,.1])
+        tr = tf._count_transitions()
+        assert tr == 2
+        numer = simulation.NumericsParameters(count_transitions_sigma=.01, count_transitions_eps=.05)
+        tf.numerics = numer
+        tr = tf._count_transitions()
+        assert tr == 1
+        numer = simulation.NumericsParameters(count_transitions_sigma=1., count_transitions_eps=.5)
+        tf.numerics = numer
+        tr = tf._count_transitions()
+        assert tr == 1
+        numer = simulation.NumericsParameters(count_transitions_sigma=1., count_transitions_eps=.05)
+        tf.numerics = numer
+        tr = tf._count_transitions()
+        assert tr == 0
+
+    @staticmethod
+    def test_sensor_from_island_charges():
+        x = np.linspace(-50,50,11)
+        sensors = np.array([[-30,-50,0], [30,-50,0]])
+        phys = simulation.PhysicsParameters(x=x, q=-1, screening_length=50, sensors=sensors)
+        tf = simulation.ThomasFermi(phys)
+        tf.n = np.array([.1,3,6,9,.1,.01,.1,.1,18,.1,.1])
+        tf.islands = np.array([[1,4],[8,9]])
+        sens = tf._sensor_from_island_charges(np.array([0,1]))
+        assert sens.shape == (2,)
+        assert np.isclose(sens[1], -1)
+        assert sens[0] > -1 and sens[0] < 0
+        sens = tf._sensor_from_island_charges(np.array([1,0]))
+        assert sens.shape == (2,)
+        assert sens[0] > -1
+        assert sens[1] > sens[0] and sens[1] < 0
+
+    @staticmethod
+    def test_calc_sensor():
+        x = np.linspace(-50,50,11)
+        sensors = np.array([[-30,-50,0], [30,-50,0]])
+        phys = simulation.PhysicsParameters(x=x, q=-1, screening_length=50, sensors=sensors)
+        tf = simulation.ThomasFermi(phys)
+        tf.n = np.array([.1,3,6,9,.1,.01,.1,.1,18,.1,.1])
+        tf.islands = np.array([[1,4],[8,9]])
+        tf.island_charges = np.array([1,1])
+        sens = tf._calc_sensor()
+        assert sens.shape == (2,)
+        assert sens[1] < sens[0]
+
+    @staticmethod
+    def test_calc_dot_states():
+        x = np.linspace(-50,50,101)
+        dot_regions = np.array([[-30,-10],[10,30]])
+        phys = simulation.PhysicsParameters(x=x, dot_regions=dot_regions)
+        tf = simulation.ThomasFermi(phys)
+        tf.islands = np.array([[-35,-8],[12,22]])+50
+        tf.island_charges = np.array([3,2])
+        tf.charge_centers = np.array([-21,16])
+        oc, comb, ch = tf._calc_dot_states()
+        assert oc.shape == (2,)
+        assert comb.shape == (1,)
+        assert ch.shape == (2,)
+        assert np.all(ch == [3,2])
+        assert np.all(comb == [False])
+        assert np.all(oc == [True, True])
+
+        tf = simulation.ThomasFermi(phys)
+        tf.islands = np.array([[-25,17]])+50
+        tf.island_charges = np.array([6])
+        tf.charge_centers = np.array([-4])
+        oc, comb, ch = tf._calc_dot_states()
+        assert np.all(ch == [6,0])
+        assert np.all(comb == [True])
+        assert np.all(oc == [True, True])
+
+        tf = simulation.ThomasFermi(phys)
+        tf.islands = np.array([[-35,-21], [2,12]])+50
+        tf.island_charges = np.array([0, 1])
+        tf.charge_centers = np.array([-27, 7])
+        oc, comb, ch = tf._calc_dot_states()
+        assert np.all(ch == [0,1])
+        assert np.all(comb == [False])
+        assert np.all(oc == [False, True])
+
+        tf = simulation.ThomasFermi(phys)
+        tf.islands = np.array([[-45,-35], [-3,7]])+50
+        tf.island_charges = np.array([2, 1])
+        tf.charge_centers = np.array([-40, 2])
+        oc, comb, ch = tf._calc_dot_states()
+        assert np.all(ch == [0,1])
+        assert np.all(comb == [False])
+        assert np.all(oc == [False, True])
+
+        tf = simulation.ThomasFermi(phys)
+        tf.islands = np.array([[-25,-17], [-3,17], [24,38]])+50
+        tf.island_charges = np.array([1,2,3])
+        tf.charge_centers = np.array([-21, 7, 36])
+        oc, comb, ch = tf._calc_dot_states()
+        assert np.all(ch == [1,5])
+        assert np.all(comb == [False])
+        assert np.all(oc == [True, True])
+
+        tf = simulation.ThomasFermi(phys)
+        tf.islands = np.array([[-40, -27], [-23,37]])+50
+        tf.island_charges = np.array([1,3])
+        tf.charge_centers = np.array([-34, 6])
+        oc, comb, ch = tf._calc_dot_states()
+        assert np.all(ch == [4,0])
+        assert np.all(comb == [True])
+        assert np.all(oc == [True, True])
+
+        tf = simulation.ThomasFermi(phys)
+        tf.islands = np.array([[-33, -16], [-13,37]])+50
+        tf.island_charges = np.array([1,3])
+        tf.charge_centers = np.array([-25, 12])
+        oc, comb, ch = tf._calc_dot_states()
+        assert np.all(ch == [1,3])
+        assert np.all(comb == [False])
+        assert np.all(oc == [True, True])
+
+        tf = simulation.ThomasFermi(phys)
+        tf.islands = np.array([[-33, -16], [-13,17], [19,38]])+50
+        tf.island_charges = np.array([1,3,2])
+        tf.charge_centers = np.array([-24, 2, 29])
+        oc, comb, ch = tf._calc_dot_states()
+        assert np.all(ch == [1,5])
+        assert np.all(comb == [False])
+        assert np.all(oc == [True, True])
+
+    @staticmethod
+    def test_island_charges_from_charge_state():
+        x = np.linspace(-50,50,101)
+        dot_regions = np.array([[-30,-10],[10,30]])
+        phys = simulation.PhysicsParameters(x=x, dot_regions=dot_regions)
+        tf = simulation.ThomasFermi(phys)
+        tf.n = np.ones(101)
+        tf.islands = np.array([[-25,-7],[13,38]])+50
+        ic = tf._island_charges_from_charge_state(np.array([2,3]), np.array([False]))
+        assert ic.shape == (2,)
+        assert np.all(ic == [2,3])
+
+        tf = simulation.ThomasFermi(phys)
+        tf.n = np.ones(101)
+        tf.islands = np.array([[-25,38]])+50
+        ic = tf._island_charges_from_charge_state(np.array([5,0]), np.array([True]))
+        assert ic.shape == (1,)
+        assert np.all(ic == [5])
+
+        tf = simulation.ThomasFermi(phys)
+        tf.n = np.ones(101)
+        tf.islands = np.array([[-33,-23],[-19,-7],[11,31]])+50
+        ic = tf._island_charges_from_charge_state(np.array([5,0]), np.array([False]))
+        assert ic.shape == (3,)
+        assert np.all(ic == [2,3,0])
+
+    @staticmethod
+    def test_sensor_from_charge_state():
+        x = np.linspace(-5,5,11)
+        dot_regions = np.array([[-3,-1],[1,3]])
+        sensors = np.array([[-3,-5,0], [3,-5,0]])
+        phys = simulation.PhysicsParameters(x=x, q=-1, screening_length=5,
+                                    sensors=sensors, dot_regions=dot_regions)
+        tf = simulation.ThomasFermi(phys)
+        tf.n = np.array([.1,3,6,9,.1,.01,.1,.1,13,.1,.1])
+        tf.islands = np.array([[1,4],[8,9]])
+        sens = tf.sensor_from_charge_state(np.array([3,2]), np.array([False]))
+        assert sens.shape == (2,)
+        assert np.all(sens < 0) and np.all(sens > -5)
+  
+    @staticmethod
+    def test_run_calculations():
+        phys = simulation.PhysicsParameters()
+        tf = simulation.ThomasFermi(phys)
+        out = tf.run_calculations(inc_trans=True)
+        assert out.transition_count is not None
+        assert out.current is None
+        assert out.inv_cap_matrix is None
+        phys = simulation.PhysicsParameters()
+        tf = simulation.ThomasFermi(phys)
+        out = tf.run_calculations(inc_curr=True, inc_inv_cap_matrix=True)
+        assert out.transition_count is None
+        assert out.current is not None
+        assert out.inv_cap_matrix is not None
+        
