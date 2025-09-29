@@ -2037,6 +2037,7 @@ class ThomasFermi:
             self.trans_count = 0
             return self.trans_count
         else:
+            trans_count = 0
             # Call most probable node the charge config (as in calc_graph_charge())
             stable_node = list(self.G.nodes)[np.argmax(self.dist)]
 
@@ -2048,12 +2049,12 @@ class ThomasFermi:
                 w_out = self.G[stable_node][nbr]["weight"]
 
                 # Calculate difference relative to weight size
-                # Add eps to weight average to prevent division by zero
                 if (
                     (w_in > sigma or w_out > sigma)
                     and abs(w_in - w_out) / (0.5 * (w_in + w_out)) < eps
                 ):
-                    self.trans_count += 1
+                    trans_count += 1
+            self.trans_count = trans_count
             return self.trans_count
 
     def _sensor_from_island_charges(
