@@ -2009,6 +2009,7 @@ class ThomasFermi:
             self._calc_stable_dist()
             current = self._calc_graph_current()
         self.current = current
+        return self.current
 
     def _count_transitions(self) -> int:
         """
