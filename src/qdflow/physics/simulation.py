@@ -1931,6 +1931,7 @@ class ThomasFermi:
             max_index = np.argmax(self.dist)
             graph_charge = list(self.G.nodes())[max_index]
         self.graph_charge = graph_charge
+        return self.graph_charge
 
     def _calc_graph_current(self) -> float:
         """
