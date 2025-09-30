@@ -156,10 +156,10 @@ class SumDistribution(Distribution[T], Generic[T]):
     """
 
     def __init__(self, dist_1: Distribution[T] | T, dist_2: Distribution[T] | T):
-        self.dist_1 = dist_1
-        self.dist_2 = dist_2
+        self._dist_1 = dist_1
+        self._dist_2 = dist_2
         if not (isinstance(dist_1, Distribution) or isinstance(dist_2, Distribution)):
-            self.dist_1 = Delta(dist_1)
+            self._dist_1 = Delta(dist_1)
 
     @overload
     def draw(self, rng: np.random.Generator, size: None = ...) -> T: ...
@@ -171,14 +171,14 @@ class SumDistribution(Distribution[T], Generic[T]):
         self, rng: np.random.Generator, size: int | tuple[int, ...] | None = None
     ) -> T | NDArray:
         d1 = (
-            self.dist_1.draw(rng, size)
-            if isinstance(self.dist_1, Distribution)
-            else self.dist_1
+            self._dist_1.draw(rng, size)
+            if isinstance(self._dist_1, Distribution)
+            else self._dist_1
         )
         d2 = (
-            self.dist_2.draw(rng, size)
-            if isinstance(self.dist_2, Distribution)
-            else self.dist_2
+            self._dist_2.draw(rng, size)
+            if isinstance(self._dist_2, Distribution)
+            else self._dist_2
         )
         if hasattr(d1, "__add__") or hasattr(d2, "__radd__"):
             return d1 + d2  # type: ignore[operator]
@@ -188,7 +188,7 @@ class SumDistribution(Distribution[T], Generic[T]):
             )
 
     def __repr__(self) -> str:
-        return "%s + %s" % (repr(self.dist_1), repr(self.dist_2))
+        return "%s + %s" % (repr(self._dist_1), repr(self._dist_2))
 
 
 class NegationDistribution(Distribution[T], Generic[T]):
@@ -202,7 +202,7 @@ class NegationDistribution(Distribution[T], Generic[T]):
     """
 
     def __init__(self, dist: Distribution[T]):
-        self.dist = dist
+        self._dist = dist
 
     @overload
     def draw(self, rng: np.random.Generator, size: None = ...) -> T: ...
@@ -213,14 +213,14 @@ class NegationDistribution(Distribution[T], Generic[T]):
     def draw(
         self, rng: np.random.Generator, size: int | tuple[int, ...] | None = None
     ) -> T | NDArray:
-        d = self.dist.draw(rng, size)
+        d = self._dist.draw(rng, size)
         if hasattr(d, "__neg__"):
             return -d  # type: ignore[operator]
         else:
             raise ValueError("Negation not supported for %s" % (repr(d)))
 
     def __repr__(self) -> str:
-        return "-(%s)" % (repr(self.dist))
+        return "-(%s)" % (repr(self._dist))
 
 
 class DifferenceDistribution(Distribution[T], Generic[T]):
@@ -234,10 +234,10 @@ class DifferenceDistribution(Distribution[T], Generic[T]):
     """
 
     def __init__(self, dist_1: Distribution[T] | T, dist_2: Distribution[T] | T):
-        self.dist_1 = dist_1
-        self.dist_2 = dist_2
+        self._dist_1 = dist_1
+        self._dist_2 = dist_2
         if not (isinstance(dist_1, Distribution) or isinstance(dist_2, Distribution)):
-            self.dist_1 = Delta(dist_1)
+            self._dist_1 = Delta(dist_1)
 
     @overload
     def draw(self, rng: np.random.Generator, size: None = ...) -> T: ...
@@ -249,14 +249,14 @@ class DifferenceDistribution(Distribution[T], Generic[T]):
         self, rng: np.random.Generator, size: int | tuple[int, ...] | None = None
     ) -> T | NDArray:
         d1 = (
-            self.dist_1.draw(rng, size)
-            if isinstance(self.dist_1, Distribution)
-            else self.dist_1
+            self._dist_1.draw(rng, size)
+            if isinstance(self._dist_1, Distribution)
+            else self._dist_1
         )
         d2 = (
-            self.dist_2.draw(rng, size)
-            if isinstance(self.dist_2, Distribution)
-            else self.dist_2
+            self._dist_2.draw(rng, size)
+            if isinstance(self._dist_2, Distribution)
+            else self._dist_2
         )
         if hasattr(d1, "__sub__") or hasattr(d2, "__rsub__"):
             return d1 - d2  # type: ignore[operator]
@@ -266,7 +266,7 @@ class DifferenceDistribution(Distribution[T], Generic[T]):
             )
 
     def __repr__(self) -> str:
-        return "%s - (%s)" % (repr(self.dist_1), repr(self.dist_2))
+        return "%s - (%s)" % (repr(self._dist_1), repr(self._dist_2))
 
 
 class ProductDistribution(Distribution[T], Generic[T]):
@@ -280,10 +280,10 @@ class ProductDistribution(Distribution[T], Generic[T]):
     """
 
     def __init__(self, dist_1: Distribution[T] | T, dist_2: Distribution[T] | T):
-        self.dist_1 = dist_1
-        self.dist_2 = dist_2
+        self._dist_1 = dist_1
+        self._dist_2 = dist_2
         if not (isinstance(dist_1, Distribution) or isinstance(dist_2, Distribution)):
-            self.dist_1 = Delta(dist_1)
+            self._dist_1 = Delta(dist_1)
 
     @overload
     def draw(self, rng: np.random.Generator, size: None = ...) -> T: ...
@@ -295,14 +295,14 @@ class ProductDistribution(Distribution[T], Generic[T]):
         self, rng: np.random.Generator, size: int | tuple[int, ...] | None = None
     ) -> T | NDArray:
         d1 = (
-            self.dist_1.draw(rng, size)
-            if isinstance(self.dist_1, Distribution)
-            else self.dist_1
+            self._dist_1.draw(rng, size)
+            if isinstance(self._dist_1, Distribution)
+            else self._dist_1
         )
         d2 = (
-            self.dist_2.draw(rng, size)
-            if isinstance(self.dist_2, Distribution)
-            else self.dist_2
+            self._dist_2.draw(rng, size)
+            if isinstance(self._dist_2, Distribution)
+            else self._dist_2
         )
         if hasattr(d1, "__mul__") or hasattr(d2, "__rmul__"):
             return d1 * d2  # type: ignore[operator]
@@ -312,7 +312,7 @@ class ProductDistribution(Distribution[T], Generic[T]):
             )
 
     def __repr__(self) -> str:
-        return "(%s) * (%s)" % (repr(self.dist_1), repr(self.dist_2))
+        return "(%s) * (%s)" % (repr(self._dist_1), repr(self._dist_2))
 
 
 class QuotientDistribution(Distribution[Any]):
@@ -328,10 +328,10 @@ class QuotientDistribution(Distribution[Any]):
     def __init__(
         self, dist_1: Distribution[Any] | Any, dist_2: Distribution[Any] | Any
     ):
-        self.dist_1 = dist_1
-        self.dist_2 = dist_2
+        self._dist_1 = dist_1
+        self._dist_2 = dist_2
         if not (isinstance(dist_1, Distribution) or isinstance(dist_2, Distribution)):
-            self.dist_1 = Delta(dist_1)
+            self._dist_1 = Delta(dist_1)
 
     @overload
     def draw(self, rng: np.random.Generator, size: None = ...) -> Any: ...
@@ -343,14 +343,14 @@ class QuotientDistribution(Distribution[Any]):
         self, rng: np.random.Generator, size: int | tuple[int, ...] | None = None
     ) -> Any | NDArray:
         d1 = (
-            self.dist_1.draw(rng, size)
-            if isinstance(self.dist_1, Distribution)
-            else self.dist_1
+            self._dist_1.draw(rng, size)
+            if isinstance(self._dist_1, Distribution)
+            else self._dist_1
         )
         d2 = (
-            self.dist_2.draw(rng, size)
-            if isinstance(self.dist_2, Distribution)
-            else self.dist_2
+            self._dist_2.draw(rng, size)
+            if isinstance(self._dist_2, Distribution)
+            else self._dist_2
         )
         if hasattr(d1, "__truediv__") or hasattr(d2, "__rtruediv__"):
             return d1 / d2  # type: ignore[operator]
@@ -360,7 +360,7 @@ class QuotientDistribution(Distribution[Any]):
             )
 
     def __repr__(self) -> str:
-        return "(%s) / (%s)" % (repr(self.dist_1), repr(self.dist_2))
+        return "(%s) / (%s)" % (repr(self._dist_1), repr(self._dist_2))
 
 
 class AbsDistribution(Distribution[T], Generic[T]):
@@ -375,7 +375,7 @@ class AbsDistribution(Distribution[T], Generic[T]):
     """
 
     def __init__(self, dist: Distribution[T]):
-        self.dist = dist
+        self._dist = dist
 
     @overload
     def draw(self, rng: np.random.Generator, size: None = ...) -> T: ...
@@ -386,10 +386,10 @@ class AbsDistribution(Distribution[T], Generic[T]):
     def draw(
         self, rng: np.random.Generator, size: int | tuple[int, ...] | None = None
     ) -> T | NDArray:
-        return np.abs(self.dist.draw(rng, size))  # type: ignore
+        return np.abs(self._dist.draw(rng, size))  # type: ignore
 
     def __repr__(self) -> str:
-        return "(%s).abs()" % (repr(self.dist))
+        return "(%s).abs()" % (repr(self._dist))
 
 
 class Delta(Distribution[T], Generic[T]):
@@ -403,7 +403,7 @@ class Delta(Distribution[T], Generic[T]):
     """
 
     def __init__(self, value: T):
-        self.value = value
+        self._value = value
 
     @overload
     def draw(self, rng: np.random.Generator, size: None = ...) -> T: ...
@@ -415,12 +415,12 @@ class Delta(Distribution[T], Generic[T]):
         self, rng: np.random.Generator, size: int | tuple[int, ...] | None = None
     ) -> T | NDArray:
         if size is None:
-            return self.value
+            return self._value
         else:
-            return np.full(size, self.value)
+            return np.full(size, self._value)
 
     def __repr__(self) -> str:
-        return "distribution.Delta(%s)" % (repr(self.value))
+        return "distribution.Delta(%s)" % (repr(self._value))
 
 
 class Normal(Distribution[float]):
@@ -436,8 +436,8 @@ class Normal(Distribution[float]):
     """
 
     def __init__(self, mean: float, stdev: float):
-        self.mean = mean
-        self.stdev = stdev
+        self._mean = mean
+        self._stdev = stdev
 
     @overload
     def draw(self, rng: np.random.Generator, size: None = ...) -> float: ...
@@ -448,10 +448,10 @@ class Normal(Distribution[float]):
     def draw(
         self, rng: np.random.Generator, size: int | tuple[int, ...] | None = None
     ) -> float | NDArray[np.float64]:
-        return rng.normal(self.mean, self.stdev, size=size)
+        return rng.normal(self._mean, self._stdev, size=size)
 
     def __repr__(self) -> str:
-        return "distribution.Normal(%s, %s)" % (repr(self.mean), repr(self.stdev))
+        return "distribution.Normal(%s, %s)" % (repr(self._mean), repr(self._stdev))
 
 
 class Uniform(Distribution[float]):
@@ -467,8 +467,8 @@ class Uniform(Distribution[float]):
     """
 
     def __init__(self, min: float, max: float):
-        self.min = min
-        self.max = max
+        self._min = min
+        self._max = max
 
     @overload
     def draw(self, rng: np.random.Generator, size: None = ...) -> float: ...
@@ -479,10 +479,10 @@ class Uniform(Distribution[float]):
     def draw(
         self, rng: np.random.Generator, size: int | tuple[int, ...] | None = None
     ) -> float | NDArray[np.float64]:
-        return rng.uniform(self.min, self.max, size=size)
+        return rng.uniform(self._min, self._max, size=size)
 
     def __repr__(self) -> str:
-        return "distribution.Uniform(%s, %s)" % (repr(self.min), repr(self.max))
+        return "distribution.Uniform(%s, %s)" % (repr(self._min), repr(self._max))
 
 
 class LogNormal(Distribution[float]):
@@ -501,8 +501,8 @@ class LogNormal(Distribution[float]):
     """
 
     def __init__(self, mu: float, sigma: float):
-        self.mu = mu
-        self.sigma = sigma
+        self._mu = mu
+        self._sigma = sigma
 
     @overload
     def draw(self, rng: np.random.Generator, size: None = ...) -> float: ...
@@ -513,10 +513,10 @@ class LogNormal(Distribution[float]):
     def draw(
         self, rng: np.random.Generator, size: int | tuple[int, ...] | None = None
     ) -> float | NDArray[np.float64]:
-        return rng.lognormal(self.mu, self.sigma, size=size)
+        return rng.lognormal(self._mu, self._sigma, size=size)
 
     def __repr__(self) -> str:
-        return "distribution.LogNormal(%s, %s)" % (repr(self.mu), repr(self.sigma))
+        return "distribution.LogNormal(%s, %s)" % (repr(self._mu), repr(self._sigma))
 
 
 class LogUniform(Distribution[float]):
@@ -532,8 +532,8 @@ class LogUniform(Distribution[float]):
     """
 
     def __init__(self, min: float, max: float):
-        self.min = min
-        self.max = max
+        self._min = min
+        self._max = max
 
     @overload
     def draw(self, rng: np.random.Generator, size: None = ...) -> float: ...
@@ -545,15 +545,15 @@ class LogUniform(Distribution[float]):
         self, rng: np.random.Generator, size: int | tuple[int, ...] | None = None
     ) -> float | NDArray[np.float64]:
         return np.minimum(
-            self.max,
+            self._max,
             np.maximum(
-                self.min,
-                np.exp(rng.uniform(np.log(self.min), np.log(self.max), size=size)),
+                self._min,
+                np.exp(rng.uniform(np.log(self._min), np.log(self._max), size=size)),
             ),
         )
 
     def __repr__(self) -> str:
-        return "distribution.LogUniform(%s, %s)" % (repr(self.min), repr(self.max))
+        return "distribution.LogUniform(%s, %s)" % (repr(self._min), repr(self._max))
 
 
 class Binary(Distribution[T], Generic[T]):
@@ -572,9 +572,9 @@ class Binary(Distribution[T], Generic[T]):
     """
 
     def __init__(self, p: float, success: T, fail: T):
-        self.p = p
-        self.success = success
-        self.fail = fail
+        self._p = p
+        self._success = success
+        self._fail = fail
 
     @overload
     def draw(self, rng: np.random.Generator, size: None = ...) -> T: ...
@@ -585,13 +585,13 @@ class Binary(Distribution[T], Generic[T]):
     def draw(
         self, rng: np.random.Generator, size: int | tuple[int, ...] | None = None
     ) -> T | NDArray:
-        return np.where(rng.uniform(size=size) < self.p, self.success, self.fail)  # type: ignore
+        return np.where(rng.uniform(size=size) < self._p, self._success, self._fail)  # type: ignore
 
     def __repr__(self) -> str:
         return "distribution.Binary(%s, %s, %s)" % (
-            repr(self.p),
-            repr(self.success),
-            repr(self.fail),
+            repr(self._p),
+            repr(self._success),
+            repr(self._fail),
         )
 
 
@@ -615,11 +615,11 @@ class Discrete(Distribution[int]):
 
     def __init__(self, a, b=None):
         if b is None:
-            self.min = 0
-            self.max = a
+            self._min = 0
+            self._max = a
         else:
-            self.min = a
-            self.max = b
+            self._min = a
+            self._max = b
 
     @overload
     def draw(self, rng: np.random.Generator, size: None = ...) -> int: ...
@@ -630,10 +630,10 @@ class Discrete(Distribution[int]):
     def draw(
         self, rng: np.random.Generator, size: int | tuple[int, ...] | None = None
     ) -> int | NDArray[np.int_]:
-        return self.min + rng.choice(self.max - self.min, size=size)
+        return self._min + rng.choice(self._max - self._min, size=size)
 
     def __repr__(self) -> str:
-        return "distribution.Discrete(%s, %s)" % (repr(self.min), repr(self.max))
+        return "distribution.Discrete(%s, %s)" % (repr(self._min), repr(self._max))
 
 
 class DependentDistributionWarning(UserWarning):
@@ -698,14 +698,14 @@ class CorrelatedDistribution(Distribution[NDArray[Any]], Generic[T]):
 
     class __DependentDistributionCore(Generic[U]):
         def __init__(self, dist: "CorrelatedDistribution[U]"):
-            self.dist = dist
-            self.values: NDArray | None = None
-            self.should_redraw = np.full(dist.num_variables, True, dtype=np.bool_)
-            self.old_size = np.array([0], dtype=np.int_)
-            self.dep_dist = tuple(
+            self._dist = dist
+            self._values: NDArray | None = None
+            self._should_redraw = np.full(dist.num_variables, True, dtype=np.bool_)
+            self._old_size = np.array([0], dtype=np.int_)
+            self._dep_dist = tuple(
                 [
                     CorrelatedDistribution.DependentDistribution(self, i)
-                    for i in range(self.dist.num_variables)
+                    for i in range(self._dist.num_variables)
                 ]
             )
 
@@ -725,41 +725,41 @@ class CorrelatedDistribution(Distribution[NDArray[Any]], Generic[T]):
                 (1,) if size is None else ((size,) if isinstance(size, int) else size)
             )
             if (
-                self.should_redraw[index]
-                or self.values is None
-                or len(self.old_size) != len(size_tup)
-                or not np.all(self.old_size == np.array(size_tup))
+                self._should_redraw[index]
+                or self._values is None
+                or len(self._old_size) != len(size_tup)
+                or not np.all(self._old_size == np.array(size_tup))
             ):
-                if not self.should_redraw[index]:
+                if not self._should_redraw[index]:
                     warnings.warn(
                         DependentDistributionWarning(
                             "draw() called on linked dependent distributions with differing size parameters."
                         )
                     )
-                elif not np.all(self.should_redraw):
+                elif not np.all(self._should_redraw):
                     warnings.warn(
                         DependentDistributionWarning(
                             "draw() called twice on dependent distribution without drawing other correlated variables."
                         )
                     )
-                self.values = self.dist.draw(rng, size_tup)
-                self.should_redraw = np.full(
-                    self.dist.num_variables, False, dtype=np.bool_
+                self._values = self._dist.draw(rng, size_tup)
+                self._should_redraw = np.full(
+                    self._dist.num_variables, False, dtype=np.bool_
                 )
-                self.old_size = np.array(size_tup)
-            self.should_redraw[index] = True
+                self._old_size = np.array(size_tup)
+            self._should_redraw[index] = True
             size_slice: tuple[slice | int, ...] = (
                 *((slice(None),) * len(size_tup)),
                 index,
             )
             return (
-                self.values[size_slice] if size is not None else self.values[0, index]
+                self._values[size_slice] if size is not None else self._values[0, index]
             )
 
         def dependent_distributions(
             self,
         ) -> tuple["CorrelatedDistribution.DependentDistribution[U]", ...]:
-            return self.dep_dist
+            return self._dep_dist
 
     class DependentDistribution(Distribution[U], Generic[U]):
         def __init__(
@@ -783,7 +783,7 @@ class CorrelatedDistribution(Distribution[NDArray[Any]], Generic[T]):
 
         def __repr__(self) -> str:
             return "%s.dependent_distributions()[%s]" % (
-                repr(self.__core.dist),
+                repr(self.__core._dist),
                 repr(self.__index),
             )
 
@@ -791,7 +791,7 @@ class CorrelatedDistribution(Distribution[NDArray[Any]], Generic[T]):
         def dependent_distributions(
             self,
         ) -> tuple["CorrelatedDistribution.DependentDistribution[U]", ...]:
-            return self.__core.dep_dist
+            return self.__core._dep_dist
 
     def dependent_distributions(
         self,
@@ -834,25 +834,25 @@ class FullyCorrelated(CorrelatedDistribution[T], Generic[T]):
     """
 
     def __init__(self, dist: Distribution[T], n: int):
-        self.dist = dist
-        self.n = n
+        self._dist = dist
+        self._n = n
 
     @property
     def num_variables(self) -> int:
-        return self.n
+        return self._n
 
     def draw(
         self, rng: np.random.Generator, size: int | tuple[int, ...] | None = None
     ) -> NDArray:
         if size is None:
-            val = self.dist.draw(rng, size=None)
-            return np.full(self.n, val)
+            val = self._dist.draw(rng, size=None)
+            return np.full(self._n, val)
         else:
-            vals = self.dist.draw(rng, size=size)
-            return np.repeat(np.expand_dims(vals, -1), self.n, axis=-1)
+            vals = self._dist.draw(rng, size=size)
+            return np.repeat(np.expand_dims(vals, -1), self._n, axis=-1)
 
     def __repr__(self) -> str:
-        return "distribution.FullyCorrelated(%s, %s)" % (repr(self.dist), repr(self.n))
+        return "distribution.FullyCorrelated(%s, %s)" % (repr(self._dist), repr(self._n))
 
 
 class MatrixCorrelated(CorrelatedDistribution[T], Generic[T]):
@@ -869,24 +869,24 @@ class MatrixCorrelated(CorrelatedDistribution[T], Generic[T]):
     """
 
     def __init__(self, matrix: NDArray, distributions: Sequence[Distribution[T]]):
-        self.matrix = matrix
-        self.distributions = distributions
+        self._matrix = matrix
+        self._distributions = distributions
 
     @property
     def num_variables(self) -> int:
-        return self.matrix.shape[0]
+        return self._matrix.shape[0]
 
     def draw(
         self, rng: np.random.Generator, size: int | tuple[int, ...] | None = None
     ) -> NDArray:
-        i_vals = np.array([d.draw(rng, size=size) for d in self.distributions])
-        d_vals = np.tensordot(i_vals, self.matrix, axes=([0], [1]))
+        i_vals = np.array([d.draw(rng, size=size) for d in self._distributions])
+        d_vals = np.tensordot(i_vals, self._matrix, axes=([0], [1]))
         return d_vals
 
     def __repr__(self) -> str:
         return "distribution.MatrixCorrelated(%s, %s)" % (
-            repr(self.matrix),
-            repr(self.distributions),
+            repr(self._matrix),
+            repr(self._distributions),
         )
 
 
@@ -906,38 +906,38 @@ class SphericallyCorrelated(CorrelatedDistribution[float]):
     """
 
     def __init__(self, n: int, radius: float | Distribution[float] = 1):
-        self.radius = radius
-        self.n = n
+        self._radius = radius
+        self._n = n
 
     @property
     def num_variables(self) -> int:
-        return self.n
+        return self._n
 
     def draw(
         self, rng: np.random.Generator, size: int | tuple[int, ...] | None = None
     ) -> NDArray:
         if size is None:
             r = (
-                self.radius.draw(rng, size=None)
-                if isinstance(self.radius, Distribution)
-                else self.radius
+                self._radius.draw(rng, size=None)
+                if isinstance(self._radius, Distribution)
+                else self._radius
             )
-            x = rng.normal(0, 1, size=self.n)
+            x = rng.normal(0, 1, size=self._n)
             x_norm = np.sqrt(np.sum(x**2))
             return r * x / x_norm
         else:
             r_arr = (
-                self.radius.draw(rng, size=size)
-                if isinstance(self.radius, Distribution)
-                else np.full(size, self.radius)
+                self._radius.draw(rng, size=size)
+                if isinstance(self._radius, Distribution)
+                else np.full(size, self._radius)
             )
-            x_size = ((size,) if isinstance(size, int) else tuple(size)) + (self.n,)
+            x_size = ((size,) if isinstance(size, int) else tuple(size)) + (self._n,)
             x = rng.normal(0, 1, size=x_size)
             x_norm = np.expand_dims(np.sqrt(np.sum(x**2, axis=-1)), -1)
             return np.expand_dims(r_arr, -1) * x / x_norm
 
     def __repr__(self) -> str:
         return "distribution.SphericallyCorrelated(%s, %s)" % (
-            repr(self.n),
-            repr(self.radius),
+            repr(self._n),
+            repr(self._radius),
         )
