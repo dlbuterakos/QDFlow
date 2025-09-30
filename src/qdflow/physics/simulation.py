@@ -2340,8 +2340,8 @@ class ThomasFermi:
                 new_dot = True
                 combined_dot_charges.append(charges)
                 combined_dot_regions.append([left, dot_regions[d][1]])
-        c_dot_regions = np.array(dot_regions)
-        c_dot_charges = np.array(dot_charges)
+        c_dot_regions = np.array(combined_dot_regions)
+        c_dot_charges = np.array(combined_dot_charges)
         n_c_dots = len(c_dot_regions)
 
         # check which islands overlap which combined dots
@@ -2385,19 +2385,12 @@ class ThomasFermi:
             elif len(overlaps) == 1:
                 island_charges[overlaps[0]] += c_dot_charges[d]
             else:
-                overlap_weight = np.array(
-                    [
-                        np.sum(
-                            self.n[
-                                max(islands[i, 0], c_dot_regions_idx[d, 0]) : min(
-                                    islands[i, 1], c_dot_regions_idx[d, 1]
-                                )
-                            ]
-                        )
-                        for i in overlaps
-                    ],
-                    dtype=np.float64,
-                )
+                overlap_weight = np.array([
+                    np.sum(self.n[
+                        max(islands[i, 0], c_dot_regions_idx[d, 0]) : \
+                        min(islands[i, 1], c_dot_regions_idx[d, 1])
+                    ]) for i in overlaps
+                ], dtype=np.float64)
                 if np.sum(overlap_weight) == 0:
                     overlap_weight = np.ones(overlap_weight.shape)
                 overlap_weight = (
