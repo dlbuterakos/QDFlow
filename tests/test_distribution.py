@@ -47,6 +47,7 @@ class TestDistributionDraw:
         val = dist.draw(rng)
         arr = dist.draw(rng, size=10)
         assert val in ["yes", "no"]
+        assert arr.shape == (10,)
         assert set(arr) <= {"yes", "no"}
 
     @staticmethod
@@ -56,9 +57,12 @@ class TestDistributionDraw:
         val = dist.draw(rng)
         arr = dist.draw(rng, size=10)
         assert 1 <= val < 4
+        assert arr.shape == (10,)
         assert np.all((arr == 1) | (arr == 2) | (arr == 3))
+        
         dist2 = distribution.Discrete(4)
         arr2 = dist2.draw(rng, size=10)
+        assert arr2.shape == (10,)
         assert np.all((arr2 >= 0) & (arr2 < 4))
 
     @staticmethod
@@ -68,6 +72,7 @@ class TestDistributionDraw:
         val = dist.draw(rng)
         arr = dist.draw(rng, size=20)
         assert 1 <= val <= 3
+        assert arr.shape == (20,)
         assert np.all((arr >= 1) & (arr <= 3))
 
     @staticmethod
@@ -77,6 +82,7 @@ class TestDistributionDraw:
         val = dist.draw(rng)
         arr = dist.draw(rng, size=20)
         assert isinstance(val, float)
+        assert arr.shape == (20,)
         assert np.all(arr > 0)
 
 # -------------------------
@@ -103,6 +109,7 @@ class TestOperatorOverload:
         dist4 = distribution.LogUniform(27,28)
         comb = dist3 + dist4
         arr = comb.draw(rng, size=20)
+        assert arr.shape == (20,)
         assert np.all((arr >= 40) & (arr <= 47))
 
     @staticmethod
@@ -123,6 +130,7 @@ class TestOperatorOverload:
         dist4 = distribution.LogUniform(27,28)
         comb = dist3 - dist4
         arr = comb.draw(rng, size=20)
+        assert arr.shape == (20,)
         assert np.all((arr >= -15) & (arr <= -8))
 
     @staticmethod
@@ -135,6 +143,7 @@ class TestOperatorOverload:
         dist2 = distribution.Uniform(13,19)
         comb = -dist2
         arr = comb.draw(rng, size=20)
+        assert arr.shape == (20,)
         assert np.all((arr >= -19) & (arr <= -13))
         
     @staticmethod
@@ -155,6 +164,7 @@ class TestOperatorOverload:
         dist4 = distribution.LogUniform(6,7)
         comb = dist3 * dist4
         arr = comb.draw(rng, size=20)
+        assert arr.shape == (20,)
         assert np.all((arr >= -21) & (arr <= -12))
 
     @staticmethod
@@ -175,6 +185,7 @@ class TestOperatorOverload:
         dist4 = distribution.LogUniform(40,48)
         comb = dist3 / dist4
         arr = comb.draw(rng, size=20)
+        assert arr.shape == (20,)
         assert np.all((arr >= .25) & (arr <= .5))
 
     @staticmethod
@@ -186,6 +197,7 @@ class TestOperatorOverload:
         val = comb.draw(rng)
         arr = dist2.draw(rng, 20)
         assert val == 3
+        assert arr.shape == (20,)
         assert np.all(arr >= 0)
 
     @staticmethod
@@ -318,6 +330,7 @@ class TestCorrelatedDistributions:
         dep_dists = mc2.dependent_distributions()
         assert len(dep_dists) == 3
         arrs = [d.draw(rng, size=20) for d in dep_dists]
+        assert np.array(arrs).shape == (3,20)
         assert np.allclose(-2*arrs[0] + .5*arrs[1], arrs[2])
 
     @staticmethod
@@ -336,6 +349,7 @@ class TestCorrelatedDistributions:
         assert len(dep_dists) == 7
         arrs = [d.draw(rng, size=20) for d in dep_dists]
         rads = np.sqrt(np.sum(np.array(arrs)**2, axis=0))
+        assert rads.shape == (20,)
         assert np.all((rads >= 9) | np.isclose(rads, 9))
         assert np.all((rads <= 10) | np.isclose(rads, 10))
 
