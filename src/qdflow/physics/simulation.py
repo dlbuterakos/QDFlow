@@ -1849,6 +1849,10 @@ class ThomasFermi:
 
         num_isls = len(self.islands)
 
+        if num_isls == 0:
+            self.G.add_node(())
+            return self.G
+
         # any deltas are allowed such that sum(abs(delta)) <= max_changes
         def calc_deltas(num_isl, max_ch):
             n = num_isl
@@ -1926,7 +1930,7 @@ class ThomasFermi:
         Sets ``self.graph_charge`` equal to the result.
         """
         if len(self.islands) == 0:
-            graph_charge = (0,)
+            graph_charge = ()
         else: 
             max_index = np.argmax(self.dist)
             graph_charge = list(self.G.nodes())[max_index]
@@ -1951,7 +1955,8 @@ class ThomasFermi:
         mu_L = self.physics.V_L * self.physics.q
         current = 0.0
         if len(self.islands) == 0:
-            print("Unexpected island length: 0")
+            current = (self.physics.short_circuit_current if self.is_short_circuit \
+                       else self.physics.barrier_current) 
         elif len(self.islands) == 1:
             for u in list(self.G.nodes()):
                 plus = tuple(np.array(u) + 1)
@@ -2143,7 +2148,7 @@ class ThomasFermi:
         will be added together as if they were a single dot.
 
         If a region has multiple islands (with charges) overlapping it, and at
-        least on of these islands overlap one or more other regions,
+        least one of these islands overlap one or more other regions,
         then that island will not be included as part of the region unless
         it overlaps the region by a greater area than any other island, or unless
         it is left with no other region to be associated with.
