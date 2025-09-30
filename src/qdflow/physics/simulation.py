@@ -1791,6 +1791,8 @@ class ThomasFermi:
         mu_L = self.physics.V_L * self.physics.q
         mu_R = self.physics.V_R * self.physics.q
 
+        weight = 0.0
+
         if num_isls == 1:
             if diff[0] == 1:
                 weight = self.p_WKB[0] * self._fermi(E_v - E_u - mu_L) \
@@ -1798,8 +1800,7 @@ class ThomasFermi:
             elif diff[0] == -1:
                 weight = self.p_WKB[0] * (1 - self._fermi(E_u - E_v - mu_L)) \
                        + self.p_WKB[1] * (1 - self._fermi(E_u - E_v - mu_R))
-            else:
-                weight = 0.0
+
         # Multi-island handling
         elif num_isls > 1:
             # Electrons coming or leaving from edges
@@ -1816,8 +1817,7 @@ class ThomasFermi:
                 weight = self.p_WKB[idx + 1] * self._fermi(E_v - E_u)
             elif diff[idx] == -1 and diff[idx + 1] == 1:
                 weight = self.p_WKB[idx + 1] * self._fermi(E_v - E_u)
-            else:
-                weight = 0.0
+
         return weight
 
     def _create_graph(self) -> networkx.DiGraph:
