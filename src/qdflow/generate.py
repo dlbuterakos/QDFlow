@@ -215,7 +215,10 @@ class CSDOutput:
         output = cls()
         for k, v in d.items():
             if hasattr(output, k):
-                setattr(output, k, v)
+                if k == "physics":
+                    setattr(output, k, simulation.PhysicsParameters.from_dict(v))
+                else:
+                    setattr(output, k, v)
         return output
     
 
@@ -1000,7 +1003,10 @@ class RaysOutput:
         output = cls()
         for k, v in d.items():
             if hasattr(output, k):
-                setattr(output, k, v)
+                if k == "physics":
+                    setattr(output, k, simulation.PhysicsParameters.from_dict(v))
+                else:
+                    setattr(output, k, v)
         return output
     
 
