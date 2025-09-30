@@ -457,7 +457,7 @@ class NumericsParameters:
     calc_n_coulomb_steps: int = 1
     calc_n_use_combination_method: bool = True
     island_relative_cutoff: float = 1e-1
-    island_min_occupancy: float = 1e-4
+    island_min_occupancy: float = 1e-3
     cap_model_matrix_softening: float = 1e-6
     stable_config_N_limit: int = 1
     count_transitions_sigma: float = 1e-8
