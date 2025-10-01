@@ -865,8 +865,8 @@ def calc_transitions(dot_charges:NDArray[np.int_], are_dots_combined:NDArray[np.
                 neighbors.append(tuple(pl))
         for nei in neighbors:
             is_tr, is_tr_com = simulation.is_transition(dot_charges[p], are_dots_combined[p], dot_charges[nei], are_dots_combined[nei])
-            is_transition_combined[p] = np.logical_or(is_transition_combined[p], is_tr)
-            is_transition[p] = np.logical_or(is_transition[p], is_tr_com)
+            is_transition_combined[p] = np.logical_or(is_transition_combined[p], is_tr_com)
+            is_transition[p] = np.logical_or(is_transition[p], is_tr)
     return is_transition, is_transition_combined
 
 
