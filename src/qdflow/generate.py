@@ -49,6 +49,7 @@ from .physics import simulation as simulation
 from .util import distribution as distribution
 import dataclasses
 from dataclasses import dataclass, field
+import copy
 
 T = TypeVar('T')
 
@@ -502,7 +503,15 @@ class PhysicsRandomization:
         dict[str, Any]
             A dict with values specified by the ``PhysicsRandomization`` object.
         '''
-        return dataclasses.asdict(self)
+        memo:dict[int, Any] = {}
+        output = {}
+        for f in dataclasses.fields(PhysicsRandomization):
+            old_val = getattr(self, f.name)
+            if id(old_val) in memo:
+                output[f.name] = memo[id(old_val)]
+            else:
+                output[f.name] = copy.deepcopy(old_val, memo=memo)
+        return output
     
 
     def copy(self) -> Self:
@@ -514,7 +523,7 @@ class PhysicsRandomization:
         CSDOutput
             A new ``PhysicsRandomization`` object with the same attribute values as ``self``.
         '''
-        return dataclasses.replace(self)
+        return copy.deepcopy(self)
 
 
 def default_physics(n_dots:int=2) -> simulation.PhysicsParameters:
