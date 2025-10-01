@@ -686,7 +686,7 @@ def calc_csd(n_dots:int, physics:simulation.PhysicsParameters,
              V_x:NDArray[np.float64], V_y:NDArray[np.float64],
              V_gates:NDArray[np.float64], x_dot:int, y_dot:int,
              numerics:simulation.NumericsParameters|None=None,
-             include_excited:bool=True, include_converged=False) -> CSDOutput:
+             include_excited:bool=True, include_converged:bool=False) -> CSDOutput:
     '''
     Calculates a charge-stability diagram, varying plunger voltages on
     2 dots and keeping all other gates constant.
