@@ -594,19 +594,12 @@ def random_physics(randomization_params:PhysicsRandomization, num_physics:int|No
     n_phys = 1 if num_physics is None else num_physics
     output = []
 
-    @overload
-    def draw(dist:T|distribution.Distribution[T], rng:np.random.Generator, size:None=...) -> T: ...
-    @overload
-    def draw(dist:T|distribution.Distribution[T], rng:np.random.Generator, size:int|tuple[int, ...]) -> NDArray: ...
-    def draw(dist:T|distribution.Distribution[T], rng:np.random.Generator, size:int|tuple[int, ...]|None=None) -> T|NDArray:
+    def draw(dist:T|distribution.Distribution[T], rng:np.random.Generator) -> T:
         if isinstance(dist, distribution.Distribution):
-            return dist.draw(rng, size)
+            return dist.draw(rng)
         else:
-            if size is None:
-                return dist
-            else:
-                return np.full(size, dist) 
-            
+            return dist
+    
     def multidraw(
         dist: float | NDArray | distribution.Distribution[Any] | distribution.Distribution[NDArray],
         n: int,
