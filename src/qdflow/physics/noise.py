@@ -48,10 +48,11 @@ amount of latching noise, etc.
 import numpy as np
 import scipy  # type: ignore[import-untyped]
 from numpy.typing import NDArray
-from typing import Any, Self, TypeVar, ClassVar
+from typing import Any, Self, TypeVar
 import scipy.ndimage  # type: ignore[import-untyped]
 import dataclasses
 from dataclasses import dataclass, field
+import copy
 
 # import .util.distribution as distribution
 from ..util.distribution import Distribution, LogNormal, LogUniform, Uniform, Normal
@@ -1119,7 +1120,15 @@ class NoiseRandomization:
         dict[str, Any]
             A dict with values specified by the ``NoiseRandomization`` object.
         """
-        return dataclasses.asdict(self)
+        memo:dict[int, Any] = {}
+        output = {}
+        for f in dataclasses.fields(NoiseRandomization):
+            old_val = getattr(self, f.name)
+            if id(old_val) in memo:
+                output[f.name] = memo[id(old_val)]
+            else:
+                output[f.name] = copy.deepcopy(old_val, memo=memo)
+        return output
 
     def copy(self) -> Self:
         """
@@ -1130,7 +1139,7 @@ class NoiseRandomization:
         CSDOutput
             A new ``NoiseRandomization`` object with the same attribute values as ``self``.
         """
-        return dataclasses.replace(self)
+        return copy.deepcopy(self)
 
 
 def random_noise_params(
