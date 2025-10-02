@@ -152,7 +152,7 @@ class NoiseParameters:
     latching_pixels: float = 0.0
     latching_positive: bool = True
     sech_blur_width: float = 0.0
-    unint_dot_mag: float = 0.0
+    unint_dot_magnitude: float = 0.0
     unint_dot_spacing: NDArray[np.float64] | None = None
     unint_dot_width: float = 0.0
     unint_dot_offset: float = 0.0
@@ -903,7 +903,7 @@ class NoiseGenerator:
         if ud and param.unint_dot_spacing is not None:
             noisy_map = self.unint_dot_add(
                 noisy_map,
-                param.unint_dot_mag,
+                param.unint_dot_magnitude,
                 param.unint_dot_spacing,
                 param.unint_dot_width,
                 param.unint_dot_offset,
@@ -1030,7 +1030,7 @@ class NoiseRandomization:
     telegraph_high_pixels: float | Distribution[float] = 1.0
     latching_pixels: float | Distribution[float] = 0.0
     sech_blur_width: float | Distribution[float] = 0.0
-    unint_dot_mag: float | Distribution[float] = 0.0
+    unint_dot_magnitude: float | Distribution[float] = 0.0
     unint_dot_spacing: (
         NDArray[np.float64]
         | Distribution[float]
@@ -1078,7 +1078,7 @@ class NoiseRandomization:
             telegraph_high_pixels=Normal(4, 1).abs(),
             latching_pixels=Normal(1, 0.3).abs(),
             sech_blur_width=Normal(0.7, 0.2).abs(),
-            unint_dot_mag=uim,
+            unint_dot_magnitude=uim,
             unint_dot_spacing=Normal(30, 10).abs(),
             unint_dot_offset=Uniform(0, 1),
             unint_dot_relative_width=Uniform(0.02, 0.03),
@@ -1199,7 +1199,7 @@ def random_noise_params(
     noise.latching_pixels = noise_scale_factor * np.abs(draw(r_p.latching_pixels, _rng))
     noise.latching_positive = draw(r_p.latching_positive, _rng)
     noise.sech_blur_width = np.abs(draw(r_p.sech_blur_width, _rng))
-    noise.unint_dot_mag = draw(r_p.unint_dot_mag, _rng)
+    noise.unint_dot_magnitude = draw(r_p.unint_dot_magnitude, _rng)
     all_spacing = (
         multidraw(r_p.unint_dot_spacing, r_p.n_gates, _rng)
         if r_p.unint_dot_spacing is not None
