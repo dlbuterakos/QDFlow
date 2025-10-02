@@ -61,7 +61,7 @@ from .simulation import ThomasFermi, ThomasFermiOutput, is_transition
 T = TypeVar("T")
 
 
-_rng = np.random.default_rng()
+_rng:np.random.Generator = np.random.default_rng()
 
 
 def set_rng_seed(seed):
@@ -458,13 +458,12 @@ class NoiseGenerator:
         output = np.array(data_map)
         low_p = 1 / max(ave_low_pixels, 1)
         high_p = 1 / max(ave_high_pixels, 1)
-        ax_len = data_map.shape[axis]
+        ax_len:int = data_map.shape[axis]
         non_axis_shape = tuple(data_map.shape[:axis]) + tuple(
             data_map.shape[axis + 1 :]
         )
-        start_low = self.rng.random(non_axis_shape) < ave_low_pixels / (
-            ave_low_pixels + ave_high_pixels
-        )
+        start_low:NDArray[np.bool_] = self.rng.uniform(0,1,size=non_axis_shape) \
+                          < ave_low_pixels / (ave_low_pixels + ave_high_pixels)
         for ind in np.ndindex(non_axis_shape):
             sd = (
                 stdev[tuple(ind[:axis]) + (slice(None),) + tuple(ind[axis:])]
@@ -476,12 +475,12 @@ class NoiseGenerator:
                 if isinstance(magnitude, np.ndarray)
                 else magnitude
             ) / 2
-            rand_arr = self.rng.random(ax_len)
+            rand_arr = self.rng.uniform(0, 1, size=ax_len)
             norm_arr = self.rng.normal(0, sd, ax_len)
             norm_start = self.rng.normal(0, (sd[0] if isinstance(sd, np.ndarray) else sd))
             low_jump = rand_arr < low_p
             high_jump = rand_arr < high_p
-            is_low = start_low[ind]
+            is_low = bool(start_low[ind])
             noise = np.zeros(ax_len)
             current_val = (-1 if is_low else 1) * (
                 mag[0] if isinstance(mag, np.ndarray) else mag
