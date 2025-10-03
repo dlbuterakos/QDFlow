@@ -694,6 +694,9 @@ class NoiseGenerator:
             equal to the spacing between transitions.
         width : float
             The width in pixels of the unitended dot peaks.
+        offset : float
+            A value between 0 and 1 which defines by how much each unintended dot peak
+            should be offset, relative to the norm of `unint_dot_spacing`.
         gate_data_matrix : ndarray[float] | None
             A matrix with shape ``(n_gates, len(data_map.shape))`` that indicates
             how each of the gates changes as one of the axes of `data_map` changes.
