@@ -190,7 +190,7 @@ class TestModuleFunctions:
         phys = generate.default_physics(n_dots)
         phys.mu = 1.23
         csd = generate.calc_csd(n_dots, phys, np.array([4,6,8,10]), np.array([5,7]),
-                np.array([0,6,0]), 0, 2, include_excited=True, include_converged=True)
+                np.array([0,6,0]), 0, 2, include_excited=True, include_converged=True, include_current=True)
         assert csd.V_x.shape == (4,)
         assert np.allclose(csd.V_x, [4,6,8,10])
         assert csd.V_y.shape == (2,)
@@ -208,6 +208,8 @@ class TestModuleFunctions:
         assert csd.are_dots_combined.shape == (4,2,2)
         assert csd.dot_charges.shape == (4,2,3)
         assert csd.physics.mu == 1.23
+        assert csd.current is not None
+        assert csd.current.shape == (4,2)
         
     @staticmethod
     def test_calc_2d_csd():
@@ -238,7 +240,7 @@ class TestModuleFunctions:
         rays = np.array([[-1,1,1],[1,-1,1],[1,1,-1]])
         resolution = 2
         ro = generate.calc_rays(phys, centers, rays, resolution,
-                                include_excited=True, include_converged=True)
+                                include_excited=True, include_converged=True, include_current=True)
         assert ro.centers.shape == (5,3)
         assert np.allclose(ro.centers, centers)
         assert ro.rays.shape == (3,3)
@@ -253,6 +255,8 @@ class TestModuleFunctions:
         assert ro.are_dots_combined.shape == (5,3,resolution,2)
         assert ro.dot_charges.shape == (5,3,resolution,3)
         assert ro.physics.mu == 1.23
+        assert ro.current is not None
+        assert ro.current.shape == (5,3,resolution)
 
     @staticmethod
     def test_calc_transitions():

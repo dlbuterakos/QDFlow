@@ -136,6 +136,7 @@ class CSDOutput:
     dot_transitions:NDArray[np.bool_]|None=None
     are_transitions_combined:NDArray[np.bool_]|None=None
     excited_sensor:NDArray[np.float32]|None=None
+    current:NDArray[np.float32]|None=None
     
     def _get_physics(self) -> simulation.PhysicsParameters:
         return self._physics
@@ -196,6 +197,11 @@ class CSDOutput:
         return self._excited_sensor
     def _set_excited_sensor(self, val:NDArray[np.float32]|None):
         self._excited_sensor = np.array(val, dtype=np.float32) if val is not None else None
+
+    def _get_current(self) -> NDArray[np.float32]|None:
+        return self._current
+    def _set_current(self, val:NDArray[np.float32]|None):
+        self._current = np.array(val, dtype=np.float32) if val is not None else None
 
 
     @classmethod
@@ -258,6 +264,7 @@ CSDOutput.dot_charges = property(CSDOutput._get_dot_charges, CSDOutput._set_dot_
 CSDOutput.dot_transitions = property(CSDOutput._get_dot_transitions, CSDOutput._set_dot_transitions) # type: ignore
 CSDOutput.are_transitions_combined = property(CSDOutput._get_are_transitions_combined, CSDOutput._set_are_transitions_combined) # type: ignore
 CSDOutput.excited_sensor = property(CSDOutput._get_excited_sensor, CSDOutput._set_excited_sensor) # type: ignore
+CSDOutput.current = property(CSDOutput._get_current, CSDOutput._set_current) # type: ignore
 
 
 
@@ -686,7 +693,8 @@ def calc_csd(n_dots:int, physics:simulation.PhysicsParameters,
              V_x:NDArray[np.float64], V_y:NDArray[np.float64],
              V_gates:NDArray[np.float64], x_dot:int, y_dot:int,
              numerics:simulation.NumericsParameters|None=None,
-             include_excited:bool=True, include_converged:bool=False) -> CSDOutput:
+             include_excited:bool=True, include_converged:bool=False,
+             include_current:bool=False) -> CSDOutput:
     '''
     Calculates a charge-stability diagram, varying plunger voltages on
     2 dots and keeping all other gates constant.
@@ -739,11 +747,13 @@ def calc_csd(n_dots:int, physics:simulation.PhysicsParameters,
                         are_dots_occupied=np.full((N_v_x, N_v_y, n_dots), False, dtype=np.bool_),
                         are_dots_combined=np.full((N_v_x, N_v_y, n_dots-1), False, dtype=np.bool_),
                         dot_charges=np.zeros((N_v_x, N_v_y, n_dots), dtype=np.int_),
-                        converged=None, excited_sensor=None)
+                        converged=None, excited_sensor=None, current=None)
     if include_converged:
         csd_out.converged = np.full((N_v_x, N_v_y), False, dtype=np.bool_)
     if include_excited:
         csd_out.excited_sensor = np.zeros((N_v_x, N_v_y, len(phys.sensors)), dtype=np.float32)
+    if include_current:
+        csd_out.current = np.zeros((N_v_x, N_v_y), dtype=np.float32)
 
     dot_charge = np.zeros(n_dots, dtype=np.int_)
     are_dot_combined = np.zeros(n_dots-1, dtype=np.bool_)
@@ -760,7 +770,7 @@ def calc_csd(n_dots:int, physics:simulation.PhysicsParameters,
             V = simulation.calc_V(phys.gates, phys.x, 0, 0, eff_peaks) 
             phys.V = V
             tf = simulation.ThomasFermi(phys, numerics=numerics)
-            tf_out = tf.run_calculations(n_guess=n_guess)
+            tf_out = tf.run_calculations(n_guess=n_guess, inc_curr=include_current)
             n_guess = tf.n
             csd_out.are_dots_occupied[i,j,:] = tf_out.are_dots_occupied
             csd_out.are_dots_combined[i,j,:] = tf_out.are_dots_combined
@@ -783,6 +793,8 @@ def calc_csd(n_dots:int, physics:simulation.PhysicsParameters,
                 dot_charge = tf_out.dot_charges
                 are_dot_combined = tf_out.are_dots_combined    
                 csd_out.excited_sensor[i,j,:] = tf.sensor_from_charge_state(ex_dot_charge, ex_are_dot_combined)
+            if include_current and csd_out.current is not None:
+                csd_out.current[i,j] = tf_out.current
 
     return csd_out
     
@@ -930,6 +942,7 @@ class RaysOutput:
     dot_transitions:NDArray[np.bool_]|None=None
     are_transitions_combined:NDArray[np.bool_]|None=None
     excited_sensor:NDArray[np.float32]|None=None
+    current:NDArray[np.float32]|None=None
     
     def _get_physics(self) -> simulation.PhysicsParameters:
         return self._physics
@@ -985,6 +998,11 @@ class RaysOutput:
         return self._excited_sensor
     def _set_excited_sensor(self, val:NDArray[np.float32]|None):
         self._excited_sensor = np.array(val, dtype=np.float32) if val is not None else None
+
+    def _get_current(self) -> NDArray[np.float32]|None:
+        return self._current
+    def _set_current(self, val:NDArray[np.float32]|None):
+        self._current = np.array(val, dtype=np.float32) if val is not None else None
 
 
     @classmethod
@@ -1046,13 +1064,15 @@ RaysOutput.dot_charges = property(RaysOutput._get_dot_charges, RaysOutput._set_d
 RaysOutput.dot_transitions = property(RaysOutput._get_dot_transitions, RaysOutput._set_dot_transitions) # type: ignore
 RaysOutput.are_transitions_combined = property(RaysOutput._get_are_transitions_combined, RaysOutput._set_are_transitions_combined) # type: ignore
 RaysOutput.excited_sensor = property(RaysOutput._get_excited_sensor, RaysOutput._set_excited_sensor) # type: ignore
+CSDOutput.current = property(CSDOutput._get_current, CSDOutput._set_current) # type: ignore
 
 
 
 def calc_rays(physics:simulation.PhysicsParameters, centers:NDArray[np.float64],
               rays:NDArray[np.float64], resolution:int,
               numerics:simulation.NumericsParameters|None=None,
-              include_excited:bool=False, include_converged=False) -> RaysOutput:
+              include_excited:bool=False, include_converged=False,
+             include_current:bool=False) -> RaysOutput:
     '''
     Calculates ray data, varying multiple plunger voltages at once to move along
     an arbitrary ray in voltage space.
@@ -1097,11 +1117,13 @@ def calc_rays(physics:simulation.PhysicsParameters, centers:NDArray[np.float64],
                         are_dots_occupied=np.full((n_centers, n_rays, resolution, n_dots), False, dtype=np.bool_),
                         are_dots_combined=np.full((n_centers, n_rays, resolution, n_dots-1), False, dtype=np.bool_),
                         dot_charges=np.zeros((n_centers, n_rays, resolution, n_dots), dtype=np.int_),
-                        converged=None, excited_sensor=None)
+                        converged=None, excited_sensor=None, current=None)
     if include_converged:
         rays_out.converged = np.full((n_centers, n_rays, resolution), False, dtype=np.bool_)
     if include_excited:
         rays_out.excited_sensor = np.zeros((n_centers, n_rays, resolution, len(phys.sensors)), dtype=np.float32)
+    if include_current:
+        rays_out.current = np.zeros((n_centers, n_rays, resolution), dtype=np.float32)
 
     dot_charge = np.zeros(n_dots, dtype=np.int_)
     are_dot_combined = np.zeros(n_dots-1, dtype=np.bool_)
@@ -1136,7 +1158,7 @@ def calc_rays(physics:simulation.PhysicsParameters, centers:NDArray[np.float64],
                     V = simulation.calc_V(phys.gates, phys.x, 0, 0, eff_peaks) 
                     phys.V = V
                     tf = simulation.ThomasFermi(phys, numerics=numerics)
-                    tf_out = tf.run_calculations(n_guess=n_guess)
+                    tf_out = tf.run_calculations(n_guess=n_guess, inc_curr=include_current)
                     n_guess = tf.n
                     rays_out.are_dots_occupied[c_i,r_i,i,:] = tf_out.are_dots_occupied
                     rays_out.are_dots_combined[c_i,r_i,i,:] = tf_out.are_dots_combined
@@ -1159,4 +1181,7 @@ def calc_rays(physics:simulation.PhysicsParameters, centers:NDArray[np.float64],
                         dot_charge = tf_out.dot_charges
                         are_dot_combined = tf_out.are_dots_combined    
                         rays_out.excited_sensor[c_i,r_i,i,:] = tf.sensor_from_charge_state(ex_dot_charge, ex_are_dot_combined)
+                    if include_current and rays_out.current is not None:
+                        rays_out.current[c_i,r_i,i] = tf_out.current
+                        
     return rays_out
