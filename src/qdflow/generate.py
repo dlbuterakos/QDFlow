@@ -802,7 +802,8 @@ def calc_csd(n_dots:int, physics:simulation.PhysicsParameters,
 def calc_2d_csd(physics:simulation.PhysicsParameters,
                 V_x:NDArray[np.float64], V_y:NDArray[np.float64],
                 numerics:simulation.NumericsParameters|None=None,
-                include_excited:bool=True, include_converged=False) -> CSDOutput:
+                include_excited:bool=True, include_converged=False,
+                include_current=True) -> CSDOutput:
     '''
     Calculates a charge-stability diagram for the case where there are only
     two dots.
@@ -827,7 +828,8 @@ def calc_2d_csd(physics:simulation.PhysicsParameters,
         A ``CSDOutput`` object wrapping the results of the computation.
     '''
     return calc_csd(2, physics, V_x, V_y, np.array([0,0]), 0, 1, numerics=numerics,
-                    include_excited=include_excited, include_converged=include_converged)
+                    include_excited=include_excited, include_converged=include_converged,
+                    include_current=include_current)
 
 
 def calc_transitions(dot_charges:NDArray[np.int_], are_dots_combined:NDArray[np.bool_]) \
