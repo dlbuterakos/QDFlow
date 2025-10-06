@@ -544,7 +544,7 @@ class NoiseGenerator:
         transpose_axes[axis] = 0
         data_map_t = np.array(np.transpose(data_map, axes=transpose_axes))
 
-        shift_all = self.rng.geometric(1 / (ave_pixels + 1), data_map_t.shape[1:]) - 1
+        shift_all = np.minimum(self.rng.geometric(1 / (ave_pixels + 1), data_map_t.shape[1:]) - 1, data_map_t.shape[0])
 
         if shift_positive:
             for ind, shift in np.ndenumerate(shift_all):
