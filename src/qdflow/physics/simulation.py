@@ -1919,7 +1919,14 @@ class ThomasFermi:
         b = np.zeros(M.shape[0])
         b[-1] = 1
 
+        # fix if one node is disconnected from graph
+        for i in range(len(a_mat)):
+            if np.sum(a_mat[i,:]) == 0 and np.sum(a_mat[:,i]) == 0 and (list(self.G.nodes)[i] != self.start_node):
+                M_solver[i,i] = 1
+                M_solver[-1,i] = 0
+
         self.dist = np.linalg.solve(M_solver, b)
+
 
         return self.dist
 
