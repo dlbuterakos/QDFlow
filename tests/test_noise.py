@@ -117,6 +117,17 @@ def test_random_noise_params():
     assert params.unint_dot_spacing is None
     assert params.sensor_gate_coupling.shape == (3,)
     assert np.allclose(params.sensor_gate_coupling, [.1,.2,.3])
+
+    rand = noise.NoiseRandomization.default()
+    rand.n_gates = 1
+    rand.unint_dot_spacing = distribution.FullyCorrelated(distribution.Uniform(3,7), 1)
+    rand.sensor_gate_coupling = distribution.Uniform(.1,.3)
+    params = noise.random_noise_params(rand)
+    assert isinstance(params, noise.NoiseParameters)
+    assert params.unint_dot_spacing.shape == (1,)
+    assert np.all((params.unint_dot_spacing >= 3) & (params.unint_dot_spacing <= 7))
+    assert params.sensor_gate_coupling.shape == (1,)
+    assert np.all((params.sensor_gate_coupling >= .1) & (params.sensor_gate_coupling <= .3))
     
 # -------------------
 # Test NoiseGenerator
@@ -354,29 +365,69 @@ class TestNoiseGenerator:
         assert np.all(noisy2[28:30] > noisy[28:30])
 
 
+    @staticmethod
+    def test_calc_noisy_map():
+        noise.set_rng_seed(456)
+        params = noise.NoiseParameters(
+            white_noise_magnitude=1.,
+            pink_noise_magnitude=1.,
+            telegraph_magnitude=1.,
+            telegraph_stdev=.3,
+            telegraph_low_pixels=3,
+            telegraph_high_pixels=3,
+            noise_axis=0,
+            latching_pixels=3,
+            latching_positive=True,
+            sech_blur_width=1,
+            unint_dot_magnitude=1.,
+            unint_dot_spacing=np.array([5,5]),
+            unint_dot_width=1.,
+            unint_dot_offset=.5,
+            coulomb_peak_spacing=12,
+            coulomb_peak_offset=.5,
+            coulomb_peak_width=5,
+            sensor_gate_coupling=np.array([-.3,-.7]),
+            use_pink_noise_all_dims=False
+        )
+        ng = noise.NoiseGenerator(params)
+        data = np.array(np.arange(30).reshape((5,6)), dtype=np.float64)
+        excited = np.array(np.arange(30,60).reshape((5,6)), dtype=np.float64)
+        dot_charges = np.concatenate([np.full((5,6,1), 1, dtype=np.int_), 
+                np.concatenate([np.full((2,6,1), 1, dtype=np.int_), np.full((3,6,1), 2, dtype=np.int_)], axis=0)
+        ], axis=2)
+        are_dots_combined = np.full((5,6,1), False, dtype=np.bool_)
+        noisy = ng.calc_noisy_map(data, latching_data=(excited, dot_charges, are_dots_combined), noise_default=True)
+        assert noisy.shape == data.shape
+        assert np.all((noisy >= 0) & (noisy <= 1.5))
 
-# def test_calc_noisy_map_all_noise_types():
-#     params = noise.NoiseParameters(
-#         white_noise_magnitude=0.1,
-#         pink_noise_magnitude=0.1,
-#         telegraph_magnitude=0.1,
-#         telegraph_stdev=0.05,
-#         telegraph_low_pixels=2,
-#         telegraph_high_pixels=2,
-#         latching_pixels=1,
-#         latching_positive=True,
-#         sech_blur_width=1.0,
-#         unint_dot_magnitude=0.1,
-#         unint_dot_spacing=np.array([1.0, 0.0]),
-#         unint_dot_width=1.0,
-#         unint_dot_offset=0.5,
-#         coulomb_peak_spacing=2.0,
-#         coulomb_peak_offset=0.5,
-#         coulomb_peak_width=1.0,
-#         sensor_gate_coupling=np.array([0.1, 0.2]),
-#         noise_axis=0
-#     )
-#     ng = noise.NoiseGenerator(params)
-#     data = make_simple_map()
-#     noisy = ng.calc_noisy_map(data)
-#     assert noisy.shape == data.shape
+        params = noise.NoiseParameters(
+            white_noise_magnitude=1.,
+            pink_noise_magnitude=1.,
+            telegraph_magnitude=1.,
+            telegraph_stdev=.3,
+            telegraph_low_pixels=3,
+            telegraph_high_pixels=3,
+            noise_axis=0,
+            latching_pixels=3,
+            latching_positive=True,
+            sech_blur_width=1,
+            unint_dot_magnitude=1.,
+            unint_dot_spacing=np.array([5,5]),
+            unint_dot_width=1.,
+            unint_dot_offset=.5,
+            coulomb_peak_spacing=12,
+            coulomb_peak_offset=.5,
+            coulomb_peak_width=5,
+            sensor_gate_coupling=np.array([-.3,-.7]),
+            use_pink_noise_all_dims=True
+        )
+        ng = noise.NoiseGenerator(params)
+        data = np.array(np.arange(30).reshape((5,6)), dtype=np.float64)
+        noisy = ng.calc_noisy_map(data, noise_default=True)
+        assert noisy.shape == data.shape
+        assert np.all((noisy >= 0) & (noisy <= 1.5))
+
+        data = np.array(np.arange(30).reshape((5,6)), dtype=np.float64)
+        noisy = ng.calc_noisy_map(data, noise_default=False)
+        assert noisy.shape == data.shape
+        assert np.allclose(noisy, data)
